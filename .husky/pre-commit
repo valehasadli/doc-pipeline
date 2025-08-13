@@ -1,0 +1,8 @@
+#!/usr/bin/env sh
+. "$(dirname -- "$0")/_/husky.sh"
+
+echo "🔍 Running pre-commit checks locally..."
+echo "📝 Linting code locally..."
+npm run lint
+echo "🧪 Running tests locally..."
+npm test
