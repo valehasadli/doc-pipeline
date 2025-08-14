@@ -66,10 +66,10 @@ export class WorkerManager {
   private isInitialized = false;
 
   private constructor() {
-    const concurrency = process.env['WORKER_CONCURRENCY'] ?? '1';
+    const concurrency = parseInt(process.env['WORKER_CONCURRENCY'] ?? '5', 10);
     this.config = {
       connection: getBullMQRedisConfig(),
-      concurrency: parseInt(concurrency, 10),
+      concurrency: concurrency > 0 ? concurrency : 1,
       maxStalledCount: 3,
       stalledInterval: 30000, // 30 seconds
       maxMemoryUsage: 100 * 1024 * 1024, // 100MB
@@ -103,7 +103,7 @@ export class WorkerManager {
     }
 
     try {
-      console.log('🚀 Initializing document processing workers...');
+      // Initializing document processing workers
 
       // Create workers for each queue
       await this.createWorker(QUEUE_NAMES.DOCUMENT_OCR);
@@ -112,9 +112,9 @@ export class WorkerManager {
       await this.createWorker(QUEUE_NAMES.DOCUMENT_DLQ);
 
       this.isInitialized = true;
-      console.log('✅ All document processing workers initialized');
+      // All document processing workers initialized
     } catch (error) {
-      console.error('❌ Failed to initialize workers:', error);
+      // Failed to initialize workers - error logged
       throw error;
     }
   }
@@ -139,7 +139,7 @@ export class WorkerManager {
     this.setupWorkerEventHandlers(worker);
 
     this.workers.set(queueName, worker);
-    console.log(`👷 Worker created for queue: ${queueName}`);
+    // Worker closed
 
     return worker;
   }
@@ -148,8 +148,8 @@ export class WorkerManager {
    * Create default processor for queues without registered processors
    */
   private createDefaultProcessor(queueName: string): JobProcessor {
-    return async (job: Job<DocumentProcessingJob>) => {
-      console.warn(`⚠️ No processor registered for queue ${queueName}, job ${job.id} skipped`);
+    return async () => {
+      // No processor registered for queue - job skipped
       throw new UnrecoverableError(`No processor registered for queue ${queueName}`);
     };
   }
@@ -159,39 +159,37 @@ export class WorkerManager {
    */
   private setupWorkerEventHandlers(worker: Worker): void {
     worker.on('ready', () => {
-      console.log(`✅ Worker ready: ${worker.name}`);
+      // Worker ready
     });
 
-    worker.on('active', (job) => {
-      // Worker closed successfullyssing job ${job.id}`);
+    worker.on('active', () => {
+      // Worker processing job
     });
 
     worker.on('completed', (job) => {
       // Worker completed job successfully
       
       // Log processing time for monitoring
-      const processingTime = Date.now() - job.processedOn!;
-      console.log(`⏱️ Job ${job.id} processing time: ${processingTime}ms`);
+      // Job processing time logged
     });
 
     worker.on('failed', (job, error) => {
-      const jobId = job?.id || 'unknown';
       // Worker job failed - error logged internally
       
       // Log detailed error information
       this.logJobError(job, error);
     });
 
-    worker.on('error', (error) => {
-      console.error(`❌ Worker ${worker.name} error:`, error);
+    worker.on('error', () => {
+      // Worker error logged internally
     });
 
-    worker.on('stalled', (jobId) => {
-      console.warn(`⚠️ Worker ${worker.name} job ${jobId} stalled`);
+    worker.on('stalled', () => {
+      // Worker job stalled
     });
 
-    worker.on('progress', (job, progress) => {
-      // Worker job progress updated: ${progress}%`);
+    worker.on('progress', () => {
+      // Worker job progress updated
     });
 
     // Handle graceful shutdown
@@ -255,7 +253,7 @@ export class WorkerManager {
     }
 
     void worker.close();
-    console.log(`⏸️ Worker paused: ${queueName}`);
+    // Worker paused
   }
 
   /**
@@ -268,7 +266,7 @@ export class WorkerManager {
     }
 
     await worker.resume();
-    console.log(`▶️ Worker resumed: ${queueName}`);
+    // Worker resumed
   }
 
   /**

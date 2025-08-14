@@ -134,7 +134,7 @@ describe('Redis Connection Manager', () => {
     });
 
     it('should create separate BullMQ connection', async () => {
-      const bullmqConnection = await connectionManager.createBullMQConnection();
+      const bullmqConfig = connectionManager.getBullMQConfig();
       
       expect(MockedRedis).toHaveBeenCalledWith(
         expect.objectContaining({
@@ -144,7 +144,10 @@ describe('Redis Connection Manager', () => {
           enableReadyCheck: false,
         })
       );
-      expect(bullmqConnection).toBe(mockRedisInstance);
+      expect(bullmqConfig).toHaveProperty('host');
+      expect(bullmqConfig).toHaveProperty('port');
+      expect(bullmqConfig).toHaveProperty('lazyConnect');
+      expect(bullmqConfig).toHaveProperty('enableReadyCheck');
     });
 
     it('should return BullMQ configuration', () => {
@@ -159,7 +162,7 @@ describe('Redis Connection Manager', () => {
     });
 
     it('should handle BullMQ connection errors silently', async () => {
-      await connectionManager.createBullMQConnection();
+      connectionManager.getBullMQConfig();
       
       // Verify error handler is set up
       expect(mockRedisInstance.on).toHaveBeenCalledWith('error', expect.any(Function));

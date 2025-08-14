@@ -27,7 +27,7 @@ export interface IRedisConfig {
 /**
  * Get Default Redis Configuration (dynamic)
  */
-function getDefaultRedisConfig(): RedisConfig {
+function getDefaultRedisConfig(): IRedisConfig {
   return {
     host: process.env['REDIS_HOST'] ?? 'localhost',
     port: parseInt(process.env['REDIS_PORT'] ?? '6379', 10),
@@ -56,14 +56,14 @@ export class RedisConnectionManager {
   private isConnected = false;
   private connectionPromise: Promise<Redis> | null = null;
 
-  private constructor(config?: Partial<RedisConfig>) {
+  private constructor(config?: Partial<IRedisConfig>) {
     this.config = { ...getDefaultRedisConfig(), ...config };
   }
 
   /**
    * Get singleton instance of Redis Connection Manager
    */
-  public static getInstance(config?: Partial<RedisConfig>): RedisConnectionManager {
+  public static getInstance(config?: Partial<IRedisConfig>): RedisConnectionManager {
     if (!RedisConnectionManager.instance) {
       RedisConnectionManager.instance = new RedisConnectionManager(config);
     }
@@ -74,13 +74,11 @@ export class RedisConnectionManager {
    * Get Redis connection with lazy initialization
    */
   public async getConnection(): Promise<Redis> {
-    if (this.config.host.length > 0 && this.config.port > 0 && this.config.db >= 0) {
-      if (this.redisClient && this.isConnected) {
-        return this.redisClient;
-      }
+    if (this.redisClient !== null && this.isConnected) {
+      return this.redisClient;
     }
 
-    if (this.connectionPromise) {
+    if (this.connectionPromise !== null) {
       return this.connectionPromise;
     }
 
@@ -112,7 +110,7 @@ export class RedisConnectionManager {
       this.setupEventHandlers();
 
       // Connect if lazy connect is disabled
-      if (this.redisClient === null || !this.config.lazyConnect) {
+      if (this.config.lazyConnect === false) {
         await this.redisClient.connect();
       }
 
@@ -153,8 +151,8 @@ export class RedisConnectionManager {
       this.isConnected = false;
     });
 
-    this.redisClient.on('reconnecting', (delay: number) => {
-      console.log(`🔄 Redis reconnecting in ${delay}ms...`);
+    this.redisClient.on('reconnecting', () => {
+      // Reconnecting to Redis
     });
 
     this.redisClient.on('end', () => {
@@ -164,11 +162,11 @@ export class RedisConnectionManager {
   }
 
   /**
-   * Create a new Redis connection for BullMQ
+   * Get BullMQ Redis configuration
    * BullMQ requires separate connections for different purposes
    */
-  public createBullMQConnection(): ConnectionOptions {
-    const redisOptions: RedisOptions = {
+  public getBullMQConfig(): RedisOptions {
+    return {
       host: this.config.host,
       port: this.config.port,
       maxRetriesPerRequest: this.config.maxRetriesPerRequest,
@@ -176,23 +174,10 @@ export class RedisConnectionManager {
       commandTimeout: this.config.commandTimeout,
       lazyConnect: this.config.lazyConnect,
       enableReadyCheck: this.config.enableReadyCheck,
-      ...(this.config.password && { password: this.config.password }),
-      ...(this.config.db && { db: this.config.db }),
-      ...(this.config.keyPrefix && { keyPrefix: this.config.keyPrefix }),
+      ...(this.config.password !== undefined && this.config.password.length > 0 && { password: this.config.password }),
+      ...(this.config.db !== undefined && this.config.db >= 0 && { db: this.config.db }),
+      ...(this.config.keyPrefix !== undefined && this.config.keyPrefix.length > 0 && { keyPrefix: this.config.keyPrefix }),
     };
-
-    const connection = new Redis(redisOptions);
-
-    // Handle errors silently for BullMQ connections
-    connection.on('error', (error) => {
-      // BullMQ handles connection errors internally
-      // We just log them for debugging
-      if (process.env['NODE_ENV'] === 'development') {
-        console.debug('Redis BullMQ connection error:', error.message);
-      }
-    });
-
-    return connection;
   }
 
   /**
@@ -204,7 +189,7 @@ export class RedisConnectionManager {
       const result = await redis.ping();
       return result === 'PONG';
     } catch (error) {
-      console.error('Redis connection test failed:', error);
+      // Error checking Redis connection status
       return false;
     }
   }
@@ -212,8 +197,11 @@ export class RedisConnectionManager {
   /**
    * Get connection status
    */
-  public getConnectionStatus(): string {
-    return 'connected';
+  public getConnectionStatus(): { isConnected: boolean; config: IRedisConfig } {
+    return {
+      isConnected: this.isConnected,
+      config: this.config,
+    };
   }
 
   /**
@@ -228,23 +216,7 @@ export class RedisConnectionManager {
     }
   }
 
-  /**
-   * Get Redis configuration for BullMQ
-   */
-  public getBullMQConfig(): RedisOptions {
-    return {
-      host: this.config.host,
-      port: this.config.port,
-      maxRetriesPerRequest: this.config.maxRetriesPerRequest,
-      connectTimeout: this.config.connectTimeout,
-      commandTimeout: this.config.commandTimeout,
-      lazyConnect: this.config.lazyConnect,
-      enableReadyCheck: this.config.enableReadyCheck,
-      ...(this.config.password && { password: this.config.password }),
-      ...(this.config.db && { db: this.config.db }),
-      ...(this.config.keyPrefix && { keyPrefix: this.config.keyPrefix }),
-    };
-  }
+
 }
 
 /**
@@ -260,7 +232,7 @@ export const getRedisConnection = async (): Promise<Redis> => {
  */
 export const createBullMQConnection = async (): Promise<Redis> => {
   const manager = RedisConnectionManager.getInstance();
-  return manager.createBullMQConnection();
+  return manager.getConnection();
 };
 
 /**
