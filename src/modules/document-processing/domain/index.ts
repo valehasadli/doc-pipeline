@@ -15,14 +15,4 @@ export * from './entities/ProcessingStatus';
 // Events
 export * from './events/DocumentEvents';
 
-// Re-export commonly used types for convenience
-export type {
-  DocumentMetadata,
-  OCRResult,
-  ValidationResult,
-  PersistenceResult,
-} from './entities/Document';
-
-export type {
-  StatusChange,
-} from './entities/ProcessingStatus';
+// All exports are handled by the wildcard exports above

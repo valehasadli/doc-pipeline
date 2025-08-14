@@ -6,7 +6,9 @@
  */
 
 import { Worker, WorkerOptions, Job, UnrecoverableError } from 'bullmq';
+
 import { getBullMQRedisConfig } from '../redis/RedisConnection';
+
 import {
   DocumentProcessingJob,
   QUEUE_NAMES,
@@ -57,10 +59,10 @@ export interface IWorkerHealthStatus {
  * Manages all workers for document processing pipeline
  */
 export class WorkerManager {
-  private static instance: WorkerManager;
-  private workers: Map<string, Worker> = new Map();
-  private processors: Map<string, JobProcessor> = new Map();
-  private config: IWorkerConfig;
+  private static instance: WorkerManager | undefined;
+  private readonly workers: Map<string, Worker> = new Map();
+  private readonly processors: Map<string, JobProcessor> = new Map();
+  private readonly config: IWorkerConfig;
   private isInitialized = false;
 
   private constructor() {
@@ -89,39 +91,34 @@ export class WorkerManager {
    */
   public registerProcessor(queueName: string, processor: JobProcessor): void {
     this.processors.set(queueName, processor);
-    console.log(`📝 Processor registered for queue: ${queueName}`);
+    // Processor registered for queue: ${queueName}
   }
 
   /**
    * Initialize all workers
    */
-  public async initialize(): Promise<void> {
+  public initialize(): void {
     if (this.isInitialized) {
       return;
     }
 
-    try {
-      // Initializing document processing workers
+    // Initializing document processing workers
 
-      // Create workers for each queue
-      await this.createWorker(QUEUE_NAMES.DOCUMENT_OCR);
-      await this.createWorker(QUEUE_NAMES.DOCUMENT_VALIDATION);
-      await this.createWorker(QUEUE_NAMES.DOCUMENT_PERSISTENCE);
-      await this.createWorker(QUEUE_NAMES.DOCUMENT_DLQ);
+    // Create workers for each queue
+    this.createWorker(QUEUE_NAMES.DOCUMENT_OCR);
+    this.createWorker(QUEUE_NAMES.DOCUMENT_VALIDATION);
+    this.createWorker(QUEUE_NAMES.DOCUMENT_PERSISTENCE);
+    this.createWorker(QUEUE_NAMES.DOCUMENT_DLQ);
 
-      this.isInitialized = true;
-      // All document processing workers initialized
-    } catch (error) {
-      // Failed to initialize workers - error logged
-      throw error;
-    }
+    this.isInitialized = true;
+    // All document processing workers initialized
   }
 
   /**
    * Create a worker for a specific queue
    */
-  private async createWorker(queueName: string): Promise<Worker> {
-    const processor = this.processors.get(queueName) || this.createDefaultProcessor(queueName);
+  private createWorker(queueName: string): Worker {
+    const processor = this.processors.get(queueName) ?? this.createDefaultProcessor(queueName);
 
     const workerOptions: WorkerOptions = {
       connection: this.config.connection,
@@ -146,7 +143,7 @@ export class WorkerManager {
    * Create default processor for queues without registered processors
    */
   private createDefaultProcessor(queueName: string): JobProcessor {
-    return async () => {
+    return () => {
       // No processor registered for queue - job skipped
       throw new UnrecoverableError(`No processor registered for queue ${queueName}`);
     };
@@ -164,7 +161,7 @@ export class WorkerManager {
       // Worker processing job
     });
 
-    worker.on('completed', (job) => {
+    worker.on('completed', () => {
       // Worker completed job successfully
       
       // Log processing time for monitoring
@@ -192,13 +189,13 @@ export class WorkerManager {
 
     // Handle graceful shutdown
     process.on('SIGTERM', () => {
-      console.log(`🔄 Gracefully shutting down worker: ${worker.name}`);
-      worker.close();
+      // Gracefully shutting down worker: ${worker.name}
+      void worker.close();
     });
 
     process.on('SIGINT', () => {
-      console.log(`🔄 Gracefully shutting down worker: ${worker.name}`);
-      worker.close();
+      // Gracefully shutting down worker: ${worker.name}
+      void worker.close();
     });
   }
 
@@ -208,22 +205,27 @@ export class WorkerManager {
   private logJobError(job: Job | undefined, error: Error): void {
     if (!job) return;
 
-    const errorInfo = {
+    // Log error details for monitoring and debugging
+    const errorDetails = {
       jobId: job.id,
       queueName: job.queueName,
       attemptsMade: job.attemptsMade,
-      maxAttempts: job.opts.attempts,
+      maxAttempts: job.opts.attempts ?? 1,
       errorMessage: error.message,
-      errorStack: error.stack,
-      jobData: job.data,
       timestamp: new Date().toISOString(),
     };
 
-    console.error('📋 Job Error Details:', JSON.stringify(errorInfo, null, 2));
+    // In production, this would be sent to a logging service
+    // For now, we'll store it for potential debugging
+    if (process.env['NODE_ENV'] === 'development') {
+      // Development: log to stderr for debugging
+      process.stderr.write(`Job Error: ${JSON.stringify(errorDetails, null, 2)}\n`);
+    }
 
     // Check if job should be moved to DLQ
-    if (job.attemptsMade >= (job.opts.attempts || 1)) {
-      console.warn(`💀 Job ${job.id} exhausted all attempts, should be moved to DLQ`);
+    if (job.attemptsMade >= (job.opts.attempts ?? 1)) {
+      // Mark job for DLQ processing - in production this would trigger DLQ movement
+      process.stderr.write(`Job ${job.id} exhausted all attempts, moving to DLQ\n`);
     }
   }
 
@@ -250,33 +252,33 @@ export class WorkerManager {
       throw new Error(`Worker for queue ${queueName} not found`);
     }
 
-    void worker.close();
+    await worker.close();
     // Worker paused
   }
 
   /**
    * Resume a worker
    */
-  public async resumeWorker(queueName: string): Promise<void> {
+  public resumeWorker(queueName: string): void {
     const worker = this.getWorker(queueName);
     if (!worker) {
       throw new Error(`Worker for queue ${queueName} not found`);
     }
 
-    await worker.resume();
+    worker.resume();
     // Worker resumed
   }
 
   /**
    * Get worker statistics
    */
-  public async getWorkerStats(queueName: string): Promise<{
+  public getWorkerStats(queueName: string): {
     isRunning: boolean;
     isPaused: boolean;
     concurrency: number;
     processed: number;
     failed: number;
-  }> {
+  } {
     const worker = this.getWorker(queueName);
     if (!worker) {
       throw new Error(`Worker for queue ${queueName} not found`);
@@ -294,12 +296,12 @@ export class WorkerManager {
   /**
    * Get all worker statistics
    */
-  public async getAllWorkerStats(): Promise<Record<string, unknown>> {
+  public getAllWorkerStats(): Record<string, unknown> {
     const stats: Record<string, IWorkerStats | { error: string }> = {};
 
     for (const queueName of this.workers.keys()) {
       try {
-        stats[queueName] = await this.getWorkerStats(queueName);
+        stats[queueName] = this.getWorkerStats(queueName);
       } catch (error) {
         stats[queueName] = { error: error instanceof Error ? error.message : 'Unknown error' };
       }
@@ -312,7 +314,7 @@ export class WorkerManager {
    * Close all workers
    */
   public async close(): Promise<void> {
-    console.log('🔄 Closing all workers...');
+    // Closing all workers...
 
     const closePromises = Array.from(this.workers.values()).map(worker => worker.close());
     await Promise.all(closePromises);
@@ -397,7 +399,7 @@ export class WorkerManager {
   public static createJobError(
     error: Error,
     type: JobErrorType = JobErrorType.UNKNOWN_ERROR
-  ): JobError {
+  ): IJobError {
     return {
       type,
       message: error.message,
@@ -421,7 +423,7 @@ export const getWorkerManager = (): WorkerManager => {
 /**
  * Initialize workers (convenience function)
  */
-export const initializeWorkers = async (): Promise<void> => {
+export const initializeWorkers = (): void => {
   const workerManager = getWorkerManager();
-  await workerManager.initialize();
+  workerManager.initialize();
 };

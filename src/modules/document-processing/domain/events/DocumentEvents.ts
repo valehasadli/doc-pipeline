@@ -11,7 +11,7 @@ import { DocumentStatus } from '../enums/DocumentStatus';
 /**
  * Base domain event interface
  */
-export interface DomainEvent {
+export interface IDomainEvent {
   readonly eventId: string;
   readonly eventType: string;
   readonly aggregateId: string;
@@ -26,7 +26,7 @@ export interface DomainEvent {
 /**
  * Document uploaded event
  */
-export interface DocumentUploadedEvent extends DomainEvent {
+export interface IDocumentUploadedEvent extends IDomainEvent {
   readonly eventType: 'DocumentUploaded';
   readonly payload: {
     readonly documentId: string;
@@ -42,7 +42,7 @@ export interface DocumentUploadedEvent extends DomainEvent {
 /**
  * Document status changed event
  */
-export interface DocumentStatusChangedEvent extends DomainEvent {
+export interface IDocumentStatusChangedEvent extends IDomainEvent {
   readonly eventType: 'DocumentStatusChanged';
   readonly payload: {
     readonly documentId: string;
@@ -58,7 +58,7 @@ export interface DocumentStatusChangedEvent extends DomainEvent {
 /**
  * Document processing started event
  */
-export interface DocumentProcessingStartedEvent extends DomainEvent {
+export interface IDocumentProcessingStartedEvent extends IDomainEvent {
   readonly eventType: 'DocumentProcessingStarted';
   readonly payload: {
     readonly documentId: string;
@@ -72,7 +72,7 @@ export interface DocumentProcessingStartedEvent extends DomainEvent {
 /**
  * Document processing completed event
  */
-export interface DocumentProcessingCompletedEvent extends DomainEvent {
+export interface IDocumentProcessingCompletedEvent extends IDomainEvent {
   readonly eventType: 'DocumentProcessingCompleted';
   readonly payload: {
     readonly documentId: string;
@@ -87,7 +87,7 @@ export interface DocumentProcessingCompletedEvent extends DomainEvent {
 /**
  * Document processing failed event
  */
-export interface DocumentProcessingFailedEvent extends DomainEvent {
+export interface IDocumentProcessingFailedEvent extends IDomainEvent {
   readonly eventType: 'DocumentProcessingFailed';
   readonly payload: {
     readonly documentId: string;
@@ -107,7 +107,7 @@ export interface DocumentProcessingFailedEvent extends DomainEvent {
 /**
  * Document OCR completed event
  */
-export interface DocumentOCRCompletedEvent extends DomainEvent {
+export interface IDocumentOCRCompletedEvent extends IDomainEvent {
   readonly eventType: 'DocumentOCRCompleted';
   readonly payload: {
     readonly documentId: string;
@@ -124,7 +124,7 @@ export interface DocumentOCRCompletedEvent extends DomainEvent {
 /**
  * Document validation completed event
  */
-export interface DocumentValidationCompletedEvent extends DomainEvent {
+export interface IDocumentValidationCompletedEvent extends IDomainEvent {
   readonly eventType: 'DocumentValidationCompleted';
   readonly payload: {
     readonly documentId: string;
@@ -141,7 +141,7 @@ export interface DocumentValidationCompletedEvent extends DomainEvent {
 /**
  * Document fully processed event
  */
-export interface DocumentFullyProcessedEvent extends DomainEvent {
+export interface IDocumentFullyProcessedEvent extends IDomainEvent {
   readonly eventType: 'DocumentFullyProcessed';
   readonly payload: {
     readonly documentId: string;
@@ -159,7 +159,7 @@ export interface DocumentFullyProcessedEvent extends DomainEvent {
 /**
  * Document moved to dead letter queue event
  */
-export interface DocumentMovedToDLQEvent extends DomainEvent {
+export interface IDocumentMovedToDLQEvent extends IDomainEvent {
   readonly eventType: 'DocumentMovedToDLQ';
   readonly payload: {
     readonly documentId: string;
@@ -178,7 +178,7 @@ export interface DocumentMovedToDLQEvent extends DomainEvent {
 /**
  * Document retry attempted event
  */
-export interface DocumentRetryAttemptedEvent extends DomainEvent {
+export interface IDocumentRetryAttemptedEvent extends IDomainEvent {
   readonly eventType: 'DocumentRetryAttempted';
   readonly payload: {
     readonly documentId: string;
@@ -194,16 +194,16 @@ export interface DocumentRetryAttemptedEvent extends DomainEvent {
  * Union type of all document events
  */
 export type DocumentEvent =
-  | DocumentUploadedEvent
-  | DocumentStatusChangedEvent
-  | DocumentProcessingStartedEvent
-  | DocumentProcessingCompletedEvent
-  | DocumentProcessingFailedEvent
-  | DocumentOCRCompletedEvent
-  | DocumentValidationCompletedEvent
-  | DocumentFullyProcessedEvent
-  | DocumentMovedToDLQEvent
-  | DocumentRetryAttemptedEvent;
+  | IDocumentUploadedEvent
+  | IDocumentStatusChangedEvent
+  | IDocumentProcessingStartedEvent
+  | IDocumentProcessingCompletedEvent
+  | IDocumentProcessingFailedEvent
+  | IDocumentOCRCompletedEvent
+  | IDocumentValidationCompletedEvent
+  | IDocumentFullyProcessedEvent
+  | IDocumentMovedToDLQEvent
+  | IDocumentRetryAttemptedEvent;
 
 /**
  * Event factory functions
@@ -213,6 +213,34 @@ export class DocumentEventFactory {
     return `evt_${Date.now()}_${Math.random().toString(36).substr(2, 9)}`;
   }
 
+  public static createIDocumentUploadedEvent(
+    aggregateId: string,
+    payload: {
+      documentId: string;
+      originalName: string;
+      filePath: string;
+      size: number;
+      mimeType: string;
+      uploadedBy?: string;
+      uploadedAt: Date;
+    },
+    metadata?: Record<string, unknown>
+  ): IDocumentUploadedEvent {
+    return {
+      eventId: DocumentEventFactory.generateEventId(),
+      eventType: 'DocumentUploaded',
+      aggregateId,
+      aggregateType: 'Document',
+      eventVersion: 1,
+      occurredAt: new Date(),
+      payload,
+      ...(metadata && { metadata }),
+    } as IDocumentUploadedEvent;
+  }
+
+  /**
+   * Alias for createIDocumentUploadedEvent (backward compatibility)
+   */
   public static createDocumentUploadedEvent(
     aggregateId: string,
     payload: {
@@ -225,17 +253,8 @@ export class DocumentEventFactory {
       uploadedAt: Date;
     },
     metadata?: Record<string, unknown>
-  ): DocumentUploadedEvent {
-    return {
-      eventId: DocumentEventFactory.generateEventId(),
-      eventType: 'DocumentUploaded',
-      aggregateId,
-      aggregateType: 'Document',
-      eventVersion: 1,
-      occurredAt: new Date(),
-      payload,
-      ...(metadata && { metadata }),
-    } as DocumentUploadedEvent;
+  ): IDocumentUploadedEvent {
+    return DocumentEventFactory.createIDocumentUploadedEvent(aggregateId, payload, metadata);
   }
 
   public static createDocumentStatusChangedEvent(
@@ -250,7 +269,7 @@ export class DocumentEventFactory {
       processingDuration?: number;
     },
     metadata?: Record<string, unknown>
-  ): DocumentStatusChangedEvent {
+  ): IDocumentStatusChangedEvent {
     return {
       eventId: DocumentEventFactory.generateEventId(),
       eventType: 'DocumentStatusChanged',
@@ -260,14 +279,14 @@ export class DocumentEventFactory {
       occurredAt: new Date(),
       payload,
       ...(metadata && { metadata }),
-    } as DocumentStatusChangedEvent;
+    } as IDocumentStatusChangedEvent;
   }
 
   public static createDocumentProcessingStartedEvent(
     documentId: string,
-    payload: DocumentProcessingStartedEvent['payload'],
+    payload: IDocumentProcessingStartedEvent['payload'],
     metadata?: Record<string, unknown>
-  ): DocumentProcessingStartedEvent {
+  ): IDocumentProcessingStartedEvent {
     return {
       eventId: DocumentEventFactory.generateEventId(),
       eventType: 'DocumentProcessingStarted',
@@ -277,14 +296,14 @@ export class DocumentEventFactory {
       occurredAt: new Date(),
       payload,
       ...(metadata && { metadata }),
-    } as DocumentProcessingStartedEvent;
+    } as IDocumentProcessingStartedEvent;
   }
 
   public static createDocumentProcessingCompletedEvent(
     documentId: string,
-    payload: DocumentProcessingCompletedEvent['payload'],
+    payload: IDocumentProcessingCompletedEvent['payload'],
     metadata?: Record<string, unknown>
-  ): DocumentProcessingCompletedEvent {
+  ): IDocumentProcessingCompletedEvent {
     return {
       eventId: DocumentEventFactory.generateEventId(),
       eventType: 'DocumentProcessingCompleted',
@@ -294,14 +313,14 @@ export class DocumentEventFactory {
       occurredAt: new Date(),
       payload,
       ...(metadata && { metadata }),
-    } as DocumentProcessingCompletedEvent;
+    } as IDocumentProcessingCompletedEvent;
   }
 
   public static createDocumentProcessingFailedEvent(
     documentId: string,
-    payload: DocumentProcessingFailedEvent['payload'],
+    payload: IDocumentProcessingFailedEvent['payload'],
     metadata?: Record<string, unknown>
-  ): DocumentProcessingFailedEvent {
+  ): IDocumentProcessingFailedEvent {
     return {
       eventId: DocumentEventFactory.generateEventId(),
       eventType: 'DocumentProcessingFailed',
@@ -311,14 +330,14 @@ export class DocumentEventFactory {
       occurredAt: new Date(),
       payload,
       ...(metadata && { metadata }),
-    } as DocumentProcessingFailedEvent;
+    } as IDocumentProcessingFailedEvent;
   }
 
   public static createDocumentOCRCompletedEvent(
     documentId: string,
-    payload: DocumentOCRCompletedEvent['payload'],
+    payload: IDocumentOCRCompletedEvent['payload'],
     metadata?: Record<string, unknown>
-  ): DocumentOCRCompletedEvent {
+  ): IDocumentOCRCompletedEvent {
     return {
       eventId: DocumentEventFactory.generateEventId(),
       eventType: 'DocumentOCRCompleted',
@@ -328,14 +347,14 @@ export class DocumentEventFactory {
       occurredAt: new Date(),
       payload,
       ...(metadata && { metadata }),
-    } as DocumentOCRCompletedEvent;
+    } as IDocumentOCRCompletedEvent;
   }
 
   public static createDocumentValidationCompletedEvent(
     documentId: string,
-    payload: DocumentValidationCompletedEvent['payload'],
+    payload: IDocumentValidationCompletedEvent['payload'],
     metadata?: Record<string, unknown>
-  ): DocumentValidationCompletedEvent {
+  ): IDocumentValidationCompletedEvent {
     return {
       eventId: DocumentEventFactory.generateEventId(),
       eventType: 'DocumentValidationCompleted',
@@ -345,14 +364,14 @@ export class DocumentEventFactory {
       occurredAt: new Date(),
       payload,
       ...(metadata && { metadata }),
-    } as DocumentValidationCompletedEvent;
+    } as IDocumentValidationCompletedEvent;
   }
 
   public static createDocumentFullyProcessedEvent(
     documentId: string,
-    payload: DocumentFullyProcessedEvent['payload'],
+    payload: IDocumentFullyProcessedEvent['payload'],
     metadata?: Record<string, unknown>
-  ): DocumentFullyProcessedEvent {
+  ): IDocumentFullyProcessedEvent {
     return {
       eventId: DocumentEventFactory.generateEventId(),
       eventType: 'DocumentFullyProcessed',
@@ -362,14 +381,14 @@ export class DocumentEventFactory {
       occurredAt: new Date(),
       payload,
       ...(metadata && { metadata }),
-    } as DocumentFullyProcessedEvent;
+    } as IDocumentFullyProcessedEvent;
   }
 
   public static createDocumentMovedToDLQEvent(
     documentId: string,
-    payload: DocumentMovedToDLQEvent['payload'],
+    payload: IDocumentMovedToDLQEvent['payload'],
     metadata?: Record<string, unknown>
-  ): DocumentMovedToDLQEvent {
+  ): IDocumentMovedToDLQEvent {
     return {
       eventId: DocumentEventFactory.generateEventId(),
       eventType: 'DocumentMovedToDLQ',
@@ -379,14 +398,14 @@ export class DocumentEventFactory {
       occurredAt: new Date(),
       payload,
       ...(metadata && { metadata }),
-    } as DocumentMovedToDLQEvent;
+    } as IDocumentMovedToDLQEvent;
   }
 
   public static createDocumentRetryAttemptedEvent(
     documentId: string,
-    payload: DocumentRetryAttemptedEvent['payload'],
+    payload: IDocumentRetryAttemptedEvent['payload'],
     metadata?: Record<string, unknown>
-  ): DocumentRetryAttemptedEvent {
+  ): IDocumentRetryAttemptedEvent {
     return {
       eventId: DocumentEventFactory.generateEventId(),
       eventType: 'DocumentRetryAttempted',
@@ -396,22 +415,27 @@ export class DocumentEventFactory {
       occurredAt: new Date(),
       payload,
       ...(metadata && { metadata }),
-    } as DocumentRetryAttemptedEvent;
+    } as IDocumentRetryAttemptedEvent;
   }
 }
 
 /**
  * Event publisher interface
  */
-export interface EventPublisher {
-  publish(event: DomainEvent): Promise<void>;
-  publishBatch(events: DomainEvent[]): Promise<void>;
+export interface IEventPublisher {
+  publish(event: IDomainEvent): Promise<void>;
+  publishBatch(events: IDomainEvent[]): Promise<void>;
 }
 
 /**
  * Event handler interface
  */
-export interface EventHandler<T extends DomainEvent = DomainEvent> {
+export interface IEventHandler<T extends IDomainEvent = IDomainEvent> {
   handle(event: T): Promise<void>;
   canHandle(eventType: string): boolean;
 }
+
+// Type aliases for cleaner names (backward compatibility)
+export type DomainEvent = IDomainEvent;
+export type EventPublisher = IEventPublisher;
+export type EventHandler<T extends IDomainEvent = IDomainEvent> = IEventHandler<T>;

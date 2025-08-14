@@ -6,18 +6,15 @@
  * and event generation.
  */
 
-import {
-  DocumentStatus,
-  ProcessingStatus,
-  DocumentEventFactory,
-  DomainEvent,
-  EventPublisher,
-} from '../index';
+import { DocumentStatus } from '../enums/DocumentStatus';
+import { DocumentEventFactory, DomainEvent, EventPublisher } from '../events/DocumentEvents';
+
+import { ProcessingStatus } from './ProcessingStatus';
 
 /**
  * Document metadata interface
  */
-export interface DocumentMetadata {
+export interface IDocumentMetadata {
   readonly originalName: string;
   readonly size: number;
   readonly mimeType: string;
@@ -30,7 +27,7 @@ export interface DocumentMetadata {
 /**
  * OCR result interface
  */
-export interface OCRResult {
+export interface IOCRResult {
   readonly text: string;
   readonly confidence: number;
   readonly language: string;
@@ -41,7 +38,7 @@ export interface OCRResult {
 /**
  * Validation result interface
  */
-export interface ValidationResult {
+export interface IValidationResult {
   readonly isValid: boolean;
   readonly errors: string[];
   readonly warnings: string[];
@@ -52,7 +49,7 @@ export interface ValidationResult {
 /**
  * Persistence result interface
  */
-export interface PersistenceResult {
+export interface IPersistenceResult {
   readonly persistedAt: Date;
   readonly storageLocation: string;
   readonly backupLocation?: string;
@@ -63,16 +60,16 @@ export interface PersistenceResult {
  * Document aggregate root
  */
 export class Document {
-  private _domainEvents: DomainEvent[] = [];
+  private domainEvents: DomainEvent[] = [];
 
   private constructor(
     private readonly _id: string,
     private readonly _filePath: string,
-    private readonly _metadata: DocumentMetadata,
+    private readonly _metadata: IDocumentMetadata,
     private _processingStatus: ProcessingStatus,
-    private _ocrResult?: OCRResult,
-    private _validationResult?: ValidationResult,
-    private _persistenceResult?: PersistenceResult,
+    private _ocrResult?: IOCRResult,
+    private _validationResult?: IValidationResult,
+    private _persistenceResult?: IPersistenceResult,
     private readonly _createdAt: Date = new Date(),
     private _updatedAt: Date = new Date()
   ) {}
@@ -80,14 +77,10 @@ export class Document {
   /**
    * Create a new document
    */
-  public static create(
-    id: string,
-    filePath: string,
-    metadata: DocumentMetadata
-  ): Document {
+  public static create(id: string, metadata: IDocumentMetadata): Document {
     const document = new Document(
       id,
-      filePath,
+      '',
       metadata,
       ProcessingStatus.create(DocumentStatus.UPLOADED)
     );
@@ -98,10 +91,10 @@ export class Document {
       {
         documentId: id,
         originalName: metadata.originalName,
-        filePath,
+        filePath: '',
         size: metadata.size,
         mimeType: metadata.mimeType,
-        ...(metadata.uploadedBy && { uploadedBy: metadata.uploadedBy }),
+        ...(metadata.uploadedBy !== undefined && metadata.uploadedBy.length > 0 ? { uploadedBy: metadata.uploadedBy } : {}),
         uploadedAt: metadata.uploadedAt,
       }
     );
@@ -116,11 +109,11 @@ export class Document {
   public static fromData(data: {
     id: string;
     filePath: string;
-    metadata: DocumentMetadata;
+    metadata: IDocumentMetadata;
     processingStatus: ProcessingStatus;
-    ocrResult?: OCRResult;
-    validationResult?: ValidationResult;
-    persistenceResult?: PersistenceResult;
+    ocrResult?: IOCRResult;
+    validationResult?: IValidationResult;
+    persistenceResult?: IPersistenceResult;
     createdAt: Date;
     updatedAt: Date;
   }): Document {
@@ -146,7 +139,7 @@ export class Document {
     return this._filePath;
   }
 
-  public get metadata(): DocumentMetadata {
+  public get metadata(): IDocumentMetadata {
     return this._metadata;
   }
 
@@ -158,15 +151,15 @@ export class Document {
     return this._processingStatus.currentStatus;
   }
 
-  public get ocrResult(): OCRResult | undefined {
+  public get ocrResult(): IOCRResult | undefined {
     return this._ocrResult;
   }
 
-  public get validationResult(): ValidationResult | undefined {
+  public get validationResult(): IValidationResult | undefined {
     return this._validationResult;
   }
 
-  public get persistenceResult(): PersistenceResult | undefined {
+  public get persistenceResult(): IPersistenceResult | undefined {
     return this._persistenceResult;
   }
 
@@ -178,8 +171,9 @@ export class Document {
     return this._updatedAt;
   }
 
-  public get domainEvents(): readonly DomainEvent[] {
-    return this._domainEvents;
+  public getDomainEvents(): readonly DomainEvent[] {
+    const events = [...this.domainEvents];
+    return events;
   }
 
   // Business methods
@@ -218,7 +212,7 @@ export class Document {
   /**
    * Complete OCR processing
    */
-  public completeOCRProcessing(ocrResult: OCRResult, jobId: string): void {
+  public completeOCRProcessing(ocrResult: IOCRResult, jobId: string): void {
     this._ocrResult = ocrResult;
     this.transitionStatus(
       DocumentStatus.OCR_COMPLETED,
@@ -226,7 +220,7 @@ export class Document {
       { jobId, confidence: ocrResult.confidence }
     );
 
-    const processingDuration = this._processingStatus.getProcessingDuration() || 0;
+    const processingDuration = this._processingStatus.getProcessingDuration() ?? 0;
 
     const completedEvent = DocumentEventFactory.createDocumentProcessingCompletedEvent(
       this._id,
@@ -312,7 +306,7 @@ export class Document {
   /**
    * Complete validation processing
    */
-  public completeValidationProcessing(validationResult: ValidationResult, jobId: string): void {
+  public completeValidationProcessing(validationResult: IValidationResult, jobId: string): void {
     this._validationResult = validationResult;
     this.transitionStatus(
       DocumentStatus.VALIDATION_COMPLETED,
@@ -320,7 +314,7 @@ export class Document {
       { jobId, isValid: validationResult.isValid }
     );
 
-    const processingDuration = this._processingStatus.getProcessingDuration() || 0;
+    const processingDuration = this._processingStatus.getProcessingDuration() ?? 0;
 
     const completedEvent = DocumentEventFactory.createDocumentProcessingCompletedEvent(
       this._id,
@@ -410,7 +404,7 @@ export class Document {
   /**
    * Complete persistence processing and mark document as fully processed
    */
-  public completePersistenceProcessing(persistenceResult: PersistenceResult, jobId: string): void {
+  public completePersistenceProcessing(persistenceResult: IPersistenceResult, jobId: string): void {
     this._persistenceResult = persistenceResult;
     this.transitionStatus(
       DocumentStatus.COMPLETED,
@@ -418,7 +412,7 @@ export class Document {
       { jobId }
     );
 
-    const totalProcessingDuration = this._processingStatus.getProcessingDuration() || 0;
+    const totalProcessingDuration = this._processingStatus.getProcessingDuration() ?? 0;
 
     const completedEvent = DocumentEventFactory.createDocumentProcessingCompletedEvent(
       this._id,
@@ -443,11 +437,11 @@ export class Document {
         stages: {
           ocr: { 
             duration: 0, // Would need to track individual stage durations
-            completedAt: this._ocrResult?.extractedAt || new Date() 
+            completedAt: this._ocrResult?.extractedAt ?? new Date() 
           },
           validation: { 
             duration: 0,
-            completedAt: this._validationResult?.validatedAt || new Date() 
+            completedAt: this._validationResult?.validatedAt ?? new Date() 
           },
           persistence: { 
             duration: 0,
@@ -534,6 +528,8 @@ export class Document {
       case 'persistence':
         targetStatus = DocumentStatus.VALIDATION_COMPLETED;
         break;
+      default:
+        throw new Error(`Invalid retry stage: ${stage as string}`);
     }
 
     this.transitionStatus(targetStatus, `Retry ${stage} processing: ${reason}`);
@@ -544,7 +540,7 @@ export class Document {
         documentId: this._id,
         stage,
         attemptNumber: this._processingStatus.retryCount + 1,
-        previousError: this._processingStatus.errorDetails || 'Unknown error',
+        previousError: this._processingStatus.errorDetails ?? 'Unknown error',
         retryReason: reason,
         scheduledAt: new Date(),
       }
@@ -580,18 +576,18 @@ export class Document {
 
   // Event management
   public clearDomainEvents(): void {
-    this._domainEvents = [];
+    this.domainEvents = [];
   }
 
   public async publishEvents(eventPublisher: EventPublisher): Promise<void> {
-    if (this._domainEvents.length > 0) {
-      await eventPublisher.publishBatch(this._domainEvents);
+    if (this.domainEvents.length > 0) {
+      await eventPublisher.publishBatch(this.domainEvents);
       this.clearDomainEvents();
     }
   }
 
   // Private methods
-  public markAsCompleted(persistenceResult: PersistenceResult): void {
+  public markAsCompleted(persistenceResult: IPersistenceResult): void {
     const oldStatus = this._processingStatus.currentStatus;
     this._processingStatus = this._processingStatus.transitionTo(
       DocumentStatus.COMPLETED,
@@ -612,7 +608,7 @@ export class Document {
         reason: 'Document fully processed',
         processingStage: 'persistence',
         retryCount: this._processingStatus.retryCount,
-        processingDuration: totalDuration || 0,
+        processingDuration: totalDuration ?? 0,
       }
     );
 
@@ -636,10 +632,10 @@ export class Document {
         documentId: this._id,
         fromStatus: oldStatus,
         toStatus: newStatus,
-        reason: reason || 'Unknown reason',
-        ...(processingStage && { processingStage }),
+        reason: reason ?? 'Unknown reason',
+        ...(processingStage !== undefined && processingStage.length > 0 ? { processingStage } : {}),
         retryCount: this._processingStatus.retryCount,
-        processingDuration: this._processingStatus.getProcessingDuration() || 0,
+        processingDuration: this._processingStatus.getProcessingDuration() ?? 0,
       }
     );
 
@@ -647,7 +643,7 @@ export class Document {
   }
 
   private addDomainEvent(event: DomainEvent): void {
-    this._domainEvents.push(event);
+    this.domainEvents.push(event);
   }
 
   private getProcessingStage(status: DocumentStatus): string | undefined {
@@ -674,22 +670,22 @@ export class Document {
   public toJSON(): {
     id: string;
     filePath: string;
-    metadata: DocumentMetadata;
+    metadata: IDocumentMetadata;
     processingStatus: ReturnType<ProcessingStatus['toJSON']>;
-    ocrResult?: OCRResult;
-    validationResult?: ValidationResult;
-    persistenceResult?: PersistenceResult;
+    ocrResult?: IOCRResult;
+    validationResult?: IValidationResult;
+    persistenceResult?: IPersistenceResult;
     createdAt: string;
     updatedAt: string;
   } {
     const result: {
       id: string;
       filePath: string;
-      metadata: DocumentMetadata;
+      metadata: IDocumentMetadata;
       processingStatus: ReturnType<ProcessingStatus['toJSON']>;
-      ocrResult?: OCRResult;
-      validationResult?: ValidationResult;
-      persistenceResult?: PersistenceResult;
+      ocrResult?: IOCRResult;
+      validationResult?: IValidationResult;
+      persistenceResult?: IPersistenceResult;
       createdAt: string;
       updatedAt: string;
     } = {
@@ -714,3 +710,9 @@ export class Document {
     return result;
   }
 }
+
+// Type aliases for cleaner names (backward compatibility)
+export type DocumentMetadata = IDocumentMetadata;
+export type OCRResult = IOCRResult;
+export type ValidationResult = IValidationResult;
+export type PersistenceResult = IPersistenceResult;

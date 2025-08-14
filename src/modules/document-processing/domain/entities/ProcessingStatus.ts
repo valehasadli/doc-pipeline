@@ -10,7 +10,7 @@ import { DocumentStatus, isValidStatusTransition, InvalidStatusTransitionError }
 /**
  * Status change metadata
  */
-export interface StatusChange {
+export interface IStatusChange {
   readonly fromStatus: DocumentStatus | null;
   readonly toStatus: DocumentStatus;
   readonly timestamp: Date;
@@ -24,7 +24,7 @@ export interface StatusChange {
 export class ProcessingStatus {
   private constructor(
     private readonly _currentStatus: DocumentStatus,
-    private readonly _statusHistory: readonly StatusChange[],
+    private readonly _statusHistory: readonly IStatusChange[],
     private readonly _lastUpdated: Date,
     private readonly _errorDetails?: string,
     private readonly _retryCount: number = 0,
@@ -37,7 +37,7 @@ export class ProcessingStatus {
    */
   public static create(initialStatus: DocumentStatus = DocumentStatus.UPLOADED): ProcessingStatus {
     const now = new Date();
-    const initialChange: StatusChange = {
+    const initialChange: IStatusChange = {
       fromStatus: null,
       toStatus: initialStatus,
       timestamp: now,
@@ -59,7 +59,7 @@ export class ProcessingStatus {
    */
   public static fromData(data: {
     currentStatus: DocumentStatus;
-    statusHistory: StatusChange[];
+    statusHistory: IStatusChange[];
     lastUpdated: Date;
     errorDetails?: string;
     retryCount?: number;
@@ -71,7 +71,7 @@ export class ProcessingStatus {
       data.statusHistory,
       data.lastUpdated,
       data.errorDetails,
-      data.retryCount || 0,
+      data.retryCount ?? 0,
       data.processingStartedAt,
       data.processingCompletedAt
     );
@@ -91,11 +91,11 @@ export class ProcessingStatus {
     }
 
     const now = new Date();
-    const statusChange: StatusChange = {
+    const statusChange: IStatusChange = {
       fromStatus: this._currentStatus,
       toStatus: newStatus,
       timestamp: now,
-      ...(reason && { reason }),
+      ...(reason !== undefined && reason.length > 0 ? { reason } : {}),
       ...(metadata && { metadata }),
     };
 
@@ -164,7 +164,7 @@ export class ProcessingStatus {
     return this._currentStatus;
   }
 
-  public get statusHistory(): readonly StatusChange[] {
+  public get statusHistory(): readonly IStatusChange[] {
     return this._statusHistory;
   }
 
@@ -215,15 +215,15 @@ export class ProcessingStatus {
       return null;
     }
     
-    const endTime = this._processingCompletedAt || new Date();
+    const endTime = this._processingCompletedAt ?? new Date();
     return endTime.getTime() - this._processingStartedAt.getTime();
   }
 
-  public getLastStatusChange(): StatusChange | null {
-    return this._statusHistory[this._statusHistory.length - 1] || null;
+  public getLastIStatusChange(): IStatusChange | null {
+    return this._statusHistory[this._statusHistory.length - 1] ?? null;
   }
 
-  public getStatusChangesForStage(stage: string): StatusChange[] {
+  public getIStatusChangesForStage(stage: string): IStatusChange[] {
     return this._statusHistory.filter(change => {
       const changeStage = this.getProcessingStageFromStatus(change.toStatus);
       return changeStage === stage;
@@ -288,7 +288,7 @@ export class ProcessingStatus {
   // Serialization
   public toJSON(): {
     currentStatus: DocumentStatus;
-    statusHistory: StatusChange[];
+    statusHistory: IStatusChange[];
     lastUpdated: string;
     errorDetails?: string;
     retryCount: number;
@@ -297,7 +297,7 @@ export class ProcessingStatus {
   } {
     const result: {
       currentStatus: DocumentStatus;
-      statusHistory: StatusChange[];
+      statusHistory: IStatusChange[];
       lastUpdated: string;
       errorDetails?: string;
       retryCount: number;
@@ -310,7 +310,7 @@ export class ProcessingStatus {
       retryCount: this._retryCount,
     };
 
-    if (this._errorDetails) {
+    if (this._errorDetails !== undefined && this._errorDetails.length > 0) {
       result.errorDetails = this._errorDetails;
     }
     if (this._processingStartedAt) {
@@ -326,10 +326,13 @@ export class ProcessingStatus {
   public equals(other: ProcessingStatus): boolean {
     return (
       this._currentStatus === other._currentStatus &&
+      this._statusHistory.length === other._statusHistory.length &&
       this._lastUpdated.getTime() === other._lastUpdated.getTime() &&
       this._errorDetails === other._errorDetails &&
-      this._retryCount === other._retryCount &&
-      this._statusHistory.length === other._statusHistory.length
+      this._retryCount === other._retryCount
     );
   }
 }
+
+// Type alias for cleaner name (backward compatibility)
+export type StatusChange = IStatusChange;

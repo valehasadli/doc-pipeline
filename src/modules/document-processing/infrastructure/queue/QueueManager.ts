@@ -54,9 +54,9 @@ export interface IQueueHealthStatus {
  * Centralizes queue management for all document processing stages
  */
 export class QueueManager {
-  private static instance: QueueManager;
+  private static instance: QueueManager | undefined;
   private readonly queues: Map<string, Queue<DocumentProcessingJob>> = new Map();
-  private config: IQueueConfig;
+  private readonly config: IQueueConfig;
   private isInitialized = false;
 
   private constructor() {
@@ -87,55 +87,52 @@ export class QueueManager {
   /**
    * Initialize all queues
    */
-  public async initialize(): Promise<void> {
+  public initialize(): void {
     if (this.isInitialized) {
       return;
     }
 
-    try {
-      console.log('🚀 Initializing document processing queues...');
+    // 🚀 Initializing document processing queues...
 
-      // Create all queues
-      await this.createQueue(QUEUE_NAMES.DOCUMENT_OCR, DEFAULT_JOB_OPTIONS['ocr'] || {});
-      await this.createQueue(QUEUE_NAMES.DOCUMENT_VALIDATION, DEFAULT_JOB_OPTIONS['validation'] || {});
-      await this.createQueue(QUEUE_NAMES.DOCUMENT_PERSISTENCE, DEFAULT_JOB_OPTIONS['persistence'] || {});
-      await this.createQueue(QUEUE_NAMES.DOCUMENT_DLQ, {
-        attempts: 1,
-        backoff: { type: 'fixed', delay: 0 },
-        removeOnComplete: 1000,
-        removeOnFail: 1000,
-      });
+    // Create all queues
+    const ocrOptions = DEFAULT_JOB_OPTIONS['ocr'] ?? {};
+    this.createQueue(QUEUE_NAMES.DOCUMENT_OCR, ocrOptions);
+    const validationOptions = DEFAULT_JOB_OPTIONS['validation'] ?? {};
+    this.createQueue(QUEUE_NAMES.DOCUMENT_VALIDATION, validationOptions);
+    const persistenceOptions = DEFAULT_JOB_OPTIONS['persistence'] ?? {};
+    this.createQueue(QUEUE_NAMES.DOCUMENT_PERSISTENCE, persistenceOptions);
+    this.createQueue(QUEUE_NAMES.DOCUMENT_DLQ, {
+      attempts: 1,
+      backoff: { type: 'fixed', delay: 0 },
+      removeOnComplete: 10,
+    });
 
-      this.isInitialized = true;
-      console.log('✅ All document processing queues initialized');
-    } catch (error) {
-      console.error('❌ Failed to initialize queues:', error);
-      throw error;
-    }
+    this.isInitialized = true;
+    // ✅ All document processing queues initialized
   }
 
   /**
    * Create a queue with configuration
    */
-  private async createQueue(queueName: string, jobOptions: Partial<JobsOptions>): Promise<Queue<DocumentProcessingJob>> {
+  private createQueue(queueName: string, jobOptions: Partial<JobsOptions>): Queue<DocumentProcessingJob> {
     let queue: Queue<DocumentProcessingJob>;
     switch (queueName) {
       case QUEUE_NAMES.DOCUMENT_OCR:
-        queue = new Queue<OCRJob>(queueName, {
+        queue = new Queue<IOCRJob>(queueName, {
           connection: this.config.connection,
-          defaultJobOptions: jobOptions || {},
+          defaultJobOptions: jobOptions,
         });
         break;
       case QUEUE_NAMES.DOCUMENT_VALIDATION:
-        queue = new Queue<ValidationJob>(queueName, {
+        queue = new Queue<IValidationJob>(queueName, {
           connection: this.config.connection,
-          defaultJobOptions: jobOptions || {},
+          defaultJobOptions: jobOptions,
         });
         break;
       case QUEUE_NAMES.DOCUMENT_PERSISTENCE:
-        queue = new Queue<PersistenceJob>(queueName, {
+        queue = new Queue<IPersistenceJob>(queueName, {
           connection: this.config.connection,
-          defaultJobOptions: jobOptions || {},
+          defaultJobOptions: jobOptions,
         });
         break;
       default:
@@ -149,7 +146,7 @@ export class QueueManager {
     this.setupQueueEventHandlers(queue);
 
     this.queues.set(queueName, queue);
-    console.log(`📋 Queue created: ${queueName}`);
+    // 📋 Queue created: ${queueName}
 
     return queue;
   }
@@ -158,29 +155,15 @@ export class QueueManager {
    * Set up event handlers for queue monitoring
    */
   private setupQueueEventHandlers(queue: Queue<DocumentProcessingJob>): void {
-    queue.on('error', (error: Error) => {
-      console.error(`❌ Queue ${queue.name} error:`, error);
+    queue.on('error', () => {
+      // ❌ Queue error occurred
     });
 
-    queue.on('waiting', (job: Job<DocumentProcessingJob>) => {
-      console.log(`⏳ Job ${job.id} waiting in queue ${queue.name}`);
+    queue.on('waiting', () => {
+      // ⏳ Job waiting in queue
     });
 
-    (queue as any).on('active', (job: Job<DocumentProcessingJob>) => {
-      console.log(`📋 Job ${job.id} is now active in queue ${queue.name}`);
-    });
-
-    (queue as any).on('completed', (job: Job<DocumentProcessingJob>) => {
-      console.log(`✅ Job ${job.id} completed in queue ${queue.name}`);
-    });
-
-    (queue as any).on('failed', (job: Job<DocumentProcessingJob>, err: Error) => {
-      console.error(`❌ Job ${job.id} failed in queue ${queue.name}:`, err.message);
-    });
-
-    (queue as any).on('stalled', (job: Job<DocumentProcessingJob>) => {
-      console.warn(`⏸️ Job ${job.id} stalled in queue ${queue.name}`);
-    });
+    // Note: 'active', 'completed', 'failed', 'stalled' events are handled by Workers, not Queues
   }
 
   /**
@@ -193,12 +176,12 @@ export class QueueManager {
   /**
    * Add OCR job to queue
    */
-  public async addOCRJob(
+  public async addIOCRJob(
     documentId: string,
     filePath: string,
-    metadata: OCRJob['metadata'],
+    metadata: IOCRJob['metadata'],
     options?: Partial<JobsOptions>
-  ): Promise<Job<OCRJob>> {
+  ): Promise<Job<IOCRJob>> {
     const ocrQueue = this.queues.get(QUEUE_NAMES.DOCUMENT_OCR);
     if (!ocrQueue) {
       throw new Error('OCR queue not initialized');
@@ -213,24 +196,36 @@ export class QueueManager {
         stage: 'ocr' as const,
       },
       {
-        priority: options?.priority || (JobPriority as any)['ocr'] || 0,
+        priority: options?.priority ?? JobPriority.NORMAL,
         ...options,
       }
     );
 
-    return job as unknown as Job<OCRJob>;
+    return job as unknown as Job<IOCRJob>;
+  }
+
+  /**
+   * Add OCR job to queue (alias for addIOCRJob)
+   */
+  public async addOCRJob(
+    documentId: string,
+    filePath: string,
+    metadata: IOCRJob['metadata'],
+    options?: Partial<JobsOptions>
+  ): Promise<Job<IOCRJob>> {
+    return this.addIOCRJob(documentId, filePath, metadata, options);
   }
 
   /**
    * Add validation job to queue
    */
-  public async addValidationJob(
+  public async addIValidationJob(
     documentId: string,
     filePath: string,
-    metadata: ValidationJob['metadata'],
-    ocrResult: ValidationJob['ocrResult'],
+    metadata: IValidationJob['metadata'],
+    ocrResult: IValidationJob['ocrResult'],
     options?: Partial<JobsOptions>
-  ): Promise<Job<ValidationJob>> {
+  ): Promise<Job<IValidationJob>> {
     const validationQueue = this.queues.get(QUEUE_NAMES.DOCUMENT_VALIDATION);
     if (!validationQueue) {
       throw new Error('Validation queue not initialized');
@@ -246,25 +241,38 @@ export class QueueManager {
         stage: 'validation' as const,
       },
       {
-        priority: options?.priority || (JobPriority as any)['validation'] || 0,
+        priority: options?.priority ?? JobPriority.NORMAL,
         ...options,
       }
     );
 
-    return job as unknown as Job<ValidationJob>;
+    return job as unknown as Job<IValidationJob>;
+  }
+
+  /**
+   * Add validation job to queue (alias for addIValidationJob)
+   */
+  public async addValidationJob(
+    documentId: string,
+    filePath: string,
+    metadata: IValidationJob['metadata'],
+    ocrResult: IValidationJob['ocrResult'],
+    options?: Partial<JobsOptions>
+  ): Promise<Job<IValidationJob>> {
+    return this.addIValidationJob(documentId, filePath, metadata, ocrResult, options);
   }
 
   /**
    * Add persistence job to queue
    */
-  public async addPersistenceJob(
+  public async addIPersistenceJob(
     documentId: string,
     filePath: string,
-    metadata: PersistenceJob['metadata'],
-    ocrResult: PersistenceJob['ocrResult'],
-    validationResult: PersistenceJob['validationResult'],
+    metadata: IPersistenceJob['metadata'],
+    ocrResult: IPersistenceJob['ocrResult'],
+    validationResult: IPersistenceJob['validationResult'],
     options?: Partial<JobsOptions>
-  ): Promise<Job<PersistenceJob>> {
+  ): Promise<Job<IPersistenceJob>> {
     const persistenceQueue = this.queues.get(QUEUE_NAMES.DOCUMENT_PERSISTENCE);
     if (!persistenceQueue) {
       throw new Error('Persistence queue not initialized');
@@ -281,12 +289,26 @@ export class QueueManager {
         stage: 'persistence' as const,
       },
       {
-        priority: options?.priority || (JobPriority as any)['persistence'] || 0,
+        priority: options?.priority ?? JobPriority.NORMAL,
         ...options,
       }
     );
 
-    return job as unknown as Job<PersistenceJob>;
+    return job as unknown as Job<IPersistenceJob>;
+  }
+
+  /**
+   * Add persistence job to queue (alias for addIPersistenceJob)
+   */
+  public async addPersistenceJob(
+    documentId: string,
+    filePath: string,
+    metadata: IPersistenceJob['metadata'],
+    ocrResult: IPersistenceJob['ocrResult'],
+    validationResult: IPersistenceJob['validationResult'],
+    options?: Partial<JobsOptions>
+  ): Promise<Job<IPersistenceJob>> {
+    return this.addIPersistenceJob(documentId, filePath, metadata, ocrResult, validationResult, options);
   }
 
   /**
@@ -294,7 +316,7 @@ export class QueueManager {
    */
   public async addToDLQ(
     originalJob: Job<DocumentProcessingJob>,
-    error: JobError
+    error: IJobError
   ): Promise<Job> {
     const dlqQueue = this.queues.get(QUEUE_NAMES.DOCUMENT_DLQ);
     if (!dlqQueue) {
@@ -315,7 +337,7 @@ export class QueueManager {
     } as unknown as DocumentProcessingJob;
 
     return dlqQueue.add('dlq-job', dlqData, {
-      priority: (JobPriority as any)['low'] || 0,
+      priority: JobPriority.LOW,
       attempts: 1,
     });
   }
@@ -379,7 +401,7 @@ export class QueueManager {
     }
 
     await queue.pause();
-    console.log(`⏸️ Queue ${queueName} paused`);
+    // ⏸️ Queue paused
   }
 
   /**
@@ -392,7 +414,7 @@ export class QueueManager {
     }
 
     await queue.resume();
-    console.log(`▶️ Queue ${queueName} resumed`);
+    // ▶️ Queue resumed
   }
 
   /**
@@ -409,14 +431,14 @@ export class QueueManager {
 
     await queue.clean(grace, 100, 'completed');
     await queue.clean(grace, 50, 'failed');
-    console.log(`🧹 Queue ${queueName} cleaned`);
+    // Queue cleaned
   }
 
   /**
    * Close all queues
    */
   public async close(): Promise<void> {
-    console.log('🔄 Closing all queues...');
+    // Closing all queues...
 
     const closePromises = Array.from(this.queues.values()).map(queue => queue.close());
     await Promise.all(closePromises);
@@ -424,7 +446,7 @@ export class QueueManager {
     this.queues.clear();
     this.isInitialized = false;
 
-    console.log('✅ All queues closed');
+    // All queues closed
   }
 
   /**
@@ -468,7 +490,7 @@ export const getQueueManager = (): QueueManager => {
 /**
  * Initialize queues (convenience function)
  */
-export const initializeQueues = async (): Promise<void> => {
+export const initializeQueues = (): void => {
   const queueManager = getQueueManager();
-  await queueManager.initialize();
+  queueManager.initialize();
 };

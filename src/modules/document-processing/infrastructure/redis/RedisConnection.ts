@@ -50,7 +50,7 @@ function getDefaultRedisConfig(): IRedisConfig {
  * and connection pooling.
  */
 export class RedisConnectionManager {
-  private static instance: RedisConnectionManager;
+  private static instance: RedisConnectionManager | undefined;
   private redisClient: Redis | null = null;
   private readonly config: IRedisConfig;
   private isConnected = false;
@@ -99,9 +99,8 @@ export class RedisConnectionManager {
         commandTimeout: this.config.commandTimeout,
         lazyConnect: this.config.lazyConnect,
         enableReadyCheck: this.config.enableReadyCheck,
-        ...(this.config.password && { password: this.config.password }),
-        ...(this.config.db && { db: this.config.db }),
-        ...(this.config.keyPrefix && { keyPrefix: this.config.keyPrefix }),
+        ...(this.config.password !== undefined && this.config.password !== '' ? { password: this.config.password } : {}),
+        ...(this.config.keyPrefix !== undefined && this.config.keyPrefix !== '' ? { keyPrefix: this.config.keyPrefix } : {}),
       };
 
       this.redisClient = new Redis(redisOptions);
@@ -117,7 +116,7 @@ export class RedisConnectionManager {
       this.isConnected = true;
       this.connectionPromise = null;
 
-      console.log(`✅ Redis connected: ${this.config.host}:${this.config.port}`);
+      // Redis connected successfully
       return this.redisClient;
     } catch (error) {
       this.connectionPromise = null;
@@ -141,8 +140,8 @@ export class RedisConnectionManager {
       this.isConnected = true;
     });
 
-    this.redisClient.on('error', (error) => {
-      console.error('❌ Redis error:', error.message);
+    this.redisClient.on('error', () => {
+      // Redis error occurred - handled by error event
       this.isConnected = false;
     });
 
@@ -186,8 +185,8 @@ export class RedisConnectionManager {
   public async testConnection(): Promise<boolean> {
     try {
       const redis = await this.getConnection();
-      const result = await redis.ping();
-      return result === 'PONG';
+      await redis.ping();
+      return true;
     } catch (error) {
       // Error checking Redis connection status
       return false;

@@ -148,7 +148,7 @@ export function isValidStatusTransition(
  * Get all valid next statuses for a given status
  */
 export function getValidNextStatuses(status: DocumentStatus): DocumentStatus[] {
-  return VALID_STATUS_TRANSITIONS[status] || [];
+  return VALID_STATUS_TRANSITIONS[status];
 }
 
 /**

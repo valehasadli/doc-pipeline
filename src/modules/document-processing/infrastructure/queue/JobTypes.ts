@@ -162,3 +162,14 @@ export interface IJobError {
   readonly timestamp: Date;
   readonly retryable: boolean;
 }
+
+// Type aliases for cleaner names (backward compatibility)
+export type DocumentMetadata = IDocumentMetadata;
+export type OCRResult = IOCRResult;
+export type ValidationResult = IValidationResult;
+export type BaseDocumentJob = IBaseDocumentJob;
+export type OCRJob = IOCRJob;
+export type ValidationJob = IValidationJob;
+export type PersistenceJob = IPersistenceJob;
+export type JobOptionsConfig = IJobOptionsConfig;
+export type JobError = IJobError;

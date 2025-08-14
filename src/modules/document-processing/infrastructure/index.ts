@@ -12,19 +12,4 @@ export * from './queue/WorkerManager';
 // Redis Infrastructure
 export * from './redis/RedisConnection';
 
-// Re-export commonly used types and functions
-export {
-  getQueueManager,
-  initializeQueues,
-} from './queue/QueueManager';
-
-export {
-  getWorkerManager,
-  initializeWorkers,
-} from './queue/WorkerManager';
-
-export {
-  getRedisConnection,
-  createBullMQConnection,
-  getBullMQRedisConfig,
-} from './redis/RedisConnection';
+// All exports are handled by the wildcard exports above
