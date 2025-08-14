@@ -10,7 +10,6 @@ export * from './enums/DocumentStatus';
 
 // Entities
 export * from './entities/Document';
-export * from './entities/ProcessingStatus';
 
 // Events
 export * from './events/DocumentEvents';

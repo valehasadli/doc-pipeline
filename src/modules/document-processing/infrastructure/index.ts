@@ -1,15 +1,17 @@
 /**
- * Document Processing Infrastructure Module
+ * Document Processing/**
+ * Infrastructure Layer Exports
  * 
- * Exports all infrastructure components for the document processing pipeline
+ * Provides access to simplified infrastructure components for the document processing module.
+ * This includes minimal BullMQ queue management, document processing, and workers.
  */
 
-// Queue Infrastructure
-export * from './queue/JobTypes';
-export * from './queue/QueueManager';
-export * from './queue/WorkerManager';
+// Simplified Queue Management
+export * from './queue/DocumentQueue';
 
-// Redis Infrastructure
-export * from './redis/RedisConnection';
+// Document Processing
+export * from './processors/DocumentProcessor';
 
-// All exports are handled by the wildcard exports above
+// Workers
+export * from './workers/DocumentWorker';
+
