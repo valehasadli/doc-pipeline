@@ -5,7 +5,7 @@
  * for the BullMQ-based document processing system.
  */
 
-export interface DocumentMetadata {
+export interface IDocumentMetadata {
   readonly originalName: string;
   readonly size: number;
   readonly mimeType: string;
@@ -13,14 +13,14 @@ export interface DocumentMetadata {
   readonly uploadedBy?: string;
 }
 
-export interface OCRResult {
+export interface IOCRResult {
   readonly text: string;
   readonly confidence: number;
   readonly language: string;
   readonly extractedAt: Date;
 }
 
-export interface ValidationResult {
+export interface IValidationResult {
   readonly isValid: boolean;
   readonly errors: string[];
   readonly warnings: string[];
@@ -30,10 +30,10 @@ export interface ValidationResult {
 /**
  * Base job data structure for all document processing jobs
  */
-export interface BaseDocumentJob {
+export interface IBaseDocumentJob {
   readonly documentId: string;
   readonly filePath: string;
-  readonly metadata: DocumentMetadata;
+  readonly metadata: IDocumentMetadata;
   readonly attemptNumber?: number;
   readonly previousError?: string;
 }
@@ -41,7 +41,7 @@ export interface BaseDocumentJob {
 /**
  * OCR Processing Job
  */
-export interface OCRJob extends BaseDocumentJob {
+export interface IOCRJob extends IBaseDocumentJob {
   readonly stage: 'ocr';
   readonly ocrConfig?: {
     readonly language?: string;
@@ -52,25 +52,25 @@ export interface OCRJob extends BaseDocumentJob {
 /**
  * Validation Processing Job
  */
-export interface ValidationJob extends BaseDocumentJob {
+export interface IValidationJob extends IBaseDocumentJob {
   readonly stage: 'validation';
-  readonly ocrResult: OCRResult;
+  readonly ocrResult: IOCRResult;
   readonly validationRules?: string[];
 }
 
 /**
  * Persistence Processing Job
  */
-export interface PersistenceJob extends BaseDocumentJob {
+export interface IPersistenceJob extends IBaseDocumentJob {
   readonly stage: 'persistence';
-  readonly ocrResult: OCRResult;
-  readonly validationResult: ValidationResult;
+  readonly ocrResult: IOCRResult;
+  readonly validationResult: IValidationResult;
 }
 
 /**
  * Union type for all document processing jobs
  */
-export type DocumentProcessingJob = OCRJob | ValidationJob | PersistenceJob;
+export type DocumentProcessingJob = IOCRJob | IValidationJob | IPersistenceJob;
 
 /**
  * Queue Names
@@ -85,7 +85,7 @@ export const QUEUE_NAMES = {
 /**
  * Job Options Configuration
  */
-export interface JobOptionsConfig {
+export interface IJobOptionsConfig {
   readonly attempts: number;
   readonly backoff: {
     readonly type: 'exponential' | 'fixed';
@@ -100,7 +100,7 @@ export interface JobOptionsConfig {
 /**
  * Default job options for different stages
  */
-export const DEFAULT_JOB_OPTIONS: Record<string, JobOptionsConfig> = {
+export const DEFAULT_JOB_OPTIONS: Record<string, IJobOptionsConfig> = {
   ocr: {
     attempts: 5,
     backoff: {
@@ -155,7 +155,7 @@ export enum JobErrorType {
 /**
  * Job Error Interface
  */
-export interface JobError {
+export interface IJobError {
   readonly type: JobErrorType;
   readonly message: string;
   readonly details?: Record<string, unknown>;

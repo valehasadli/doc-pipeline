@@ -6,22 +6,24 @@
  */
 
 import { Queue, Job, JobsOptions } from 'bullmq';
+
 import { getBullMQRedisConfig } from '../redis/RedisConnection';
+
 import {
-  QUEUE_NAMES,
   DocumentProcessingJob,
-  OCRJob,
-  ValidationJob,
-  PersistenceJob,
-  JobError,
+  IOCRJob,
+  IValidationJob,
+  IPersistenceJob,
+  IJobError,
   DEFAULT_JOB_OPTIONS,
   JobPriority,
+  QUEUE_NAMES,
 } from './JobTypes';
 
 /**
  * Queue Configuration Interface
  */
-export interface QueueConfig {
+export interface IQueueConfig {
   readonly connection: ReturnType<typeof getBullMQRedisConfig>;
   readonly defaultJobOptions: JobsOptions;
 }
@@ -29,7 +31,7 @@ export interface QueueConfig {
 /**
  * Queue Statistics Interface
  */
-export interface QueueStats {
+export interface IQueueStats {
   readonly waiting: number;
   readonly active: number;
   readonly completed: number;
@@ -40,10 +42,10 @@ export interface QueueStats {
 /**
  * Queue Health Status Interface
  */
-export interface QueueHealthStatus {
+export interface IQueueHealthStatus {
   readonly healthy: boolean;
   readonly error?: string;
-  readonly stats?: QueueStats;
+  readonly stats?: IQueueStats;
 }
 
 /**
@@ -54,7 +56,7 @@ export interface QueueHealthStatus {
 export class QueueManager {
   private static instance: QueueManager;
   private readonly queues: Map<string, Queue<DocumentProcessingJob>> = new Map();
-  private config: QueueConfig;
+  private config: IQueueConfig;
   private isInitialized = false;
 
   private constructor() {
@@ -353,8 +355,8 @@ export class QueueManager {
   /**
    * Get all queue statistics
    */
-  public async getAllQueueStats(): Promise<Record<string, QueueStats | { error: string }>> {
-    const stats: Record<string, QueueStats | { error: string }> = {};
+  public async getAllQueueStats(): Promise<Record<string, IQueueStats | { error: string }>> {
+    const stats: Record<string, IQueueStats | { error: string }> = {};
 
     for (const queueName of Object.values(QUEUE_NAMES)) {
       try {
@@ -430,9 +432,9 @@ export class QueueManager {
    */
   public async healthCheck(): Promise<{
     healthy: boolean;
-    queues: Record<string, { healthy: boolean; error?: string }>;
+    queues: Record<string, IQueueHealthStatus>;
   }> {
-    const queueHealth: Record<string, { healthy: boolean; error?: string }> = {};
+    const queueHealth: Record<string, IQueueHealthStatus> = {};
     let allHealthy = true;
 
     for (const [queueName, queue] of this.queues) {

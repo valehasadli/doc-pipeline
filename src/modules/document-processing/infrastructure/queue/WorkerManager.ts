@@ -8,18 +8,16 @@
 import { Worker, WorkerOptions, Job, UnrecoverableError } from 'bullmq';
 import { getBullMQRedisConfig } from '../redis/RedisConnection';
 import {
-  QUEUE_NAMES,
   DocumentProcessingJob,
-} from './JobTypes';
-import {
-  JobError,
+  QUEUE_NAMES,
   JobErrorType,
+  IJobError,
 } from './JobTypes';
 
 /**
  * Worker Configuration Interface
  */
-export interface WorkerConfig {
+export interface IWorkerConfig {
   readonly connection: ReturnType<typeof getBullMQRedisConfig>;
   readonly concurrency: number;
   readonly maxStalledCount: number;
@@ -35,7 +33,7 @@ export type JobProcessor<T = DocumentProcessingJob> = (job: Job<T>) => Promise<v
 /**
  * Worker Statistics Interface
  */
-export interface WorkerStats {
+export interface IWorkerStats {
   readonly isRunning: boolean;
   readonly isPaused: boolean;
   readonly concurrency: number;
@@ -46,7 +44,7 @@ export interface WorkerStats {
 /**
  * Worker Health Status Interface
  */
-export interface WorkerHealthStatus {
+export interface IWorkerHealthStatus {
   readonly healthy: boolean;
   readonly isRunning: boolean;
   readonly isPaused: boolean;
@@ -62,7 +60,7 @@ export class WorkerManager {
   private static instance: WorkerManager;
   private workers: Map<string, Worker> = new Map();
   private processors: Map<string, JobProcessor> = new Map();
-  private config: WorkerConfig;
+  private config: IWorkerConfig;
   private isInitialized = false;
 
   private constructor() {
@@ -297,7 +295,7 @@ export class WorkerManager {
    * Get all worker statistics
    */
   public async getAllWorkerStats(): Promise<Record<string, unknown>> {
-    const stats: Record<string, WorkerStats | { error: string }> = {};
+    const stats: Record<string, IWorkerStats | { error: string }> = {};
 
     for (const queueName of this.workers.keys()) {
       try {
@@ -329,8 +327,8 @@ export class WorkerManager {
   /**
    * Health check for all workers
    */
-  public healthCheck(): { healthy: boolean; workers: Record<string, { healthy: boolean; error?: string }> } {
-    const workerHealth: Record<string, WorkerHealthStatus> = {};
+  public healthCheck(): { healthy: boolean; workers: Record<string, IWorkerHealthStatus> } {
+    const workerHealth: Record<string, IWorkerHealthStatus> = {};
     let allHealthy = true;
 
     for (const [queueName, worker] of this.workers) {
