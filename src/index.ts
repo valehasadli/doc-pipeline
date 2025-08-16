@@ -1,10 +1,14 @@
 import 'reflect-metadata';
+import 'dotenv/config';
 import compression from 'compression';
 import cors from 'cors';
 import express from 'express';
 import rateLimit from 'express-rate-limit';
 import helmet from 'helmet';
 
+import { MongoConnection } from '@document-processing/infrastructure/database/connection/MongoConnection';
+import { DocumentWorker } from '@document-processing/infrastructure/workers/DocumentWorker';
+import { createDocumentRoutes } from '@document-processing/presentation/routes/documentRoutes';
 import { createHealthRoutes } from '@health/presentation/routes';
 
 /**
@@ -81,8 +85,8 @@ class Application {
     // Health check routes (no /api prefix for health checks)
     this.app.use('/', createHealthRoutes());
 
-    // API routes will be added here later
-    // this.app.use('/api', apiRoutes);
+    // Document processing API routes
+    this.app.use('/api/documents', createDocumentRoutes());
 
     // Root endpoint
     this.app.get('/', (_req, res) => {
@@ -132,8 +136,7 @@ class Application {
 
   public start(): void {
     try {
-      // Future: Initialize database connections, queues, etc.
-      
+      // Start server first, then initialize connections asynchronously
       this.app.listen(this.port, () => {
         // Server startup logging - using proper environment variable handling
         const nodeEnv = process.env['NODE_ENV'] ?? 'development';
@@ -149,6 +152,9 @@ class Application {
           // eslint-disable-next-line no-console
           console.log(`🌍 Environment: ${nodeEnv}`);
         }
+
+        // Initialize connections after server starts (non-blocking)
+        void this.initializeConnections();
       });
     } catch (error) {
       const nodeEnv = process.env['NODE_ENV'] ?? 'development';
@@ -157,6 +163,37 @@ class Application {
         console.error('❌ Failed to start server:', error);
       }
       process.exit(1);
+    }
+  }
+
+  private async initializeConnections(): Promise<void> {
+    try {
+      // Initialize MongoDB connection with timeout
+      // eslint-disable-next-line no-console
+      console.log('🔌 Connecting to MongoDB...');
+      const mongoTimeout = setTimeout(() => {
+        // eslint-disable-next-line no-console
+        console.log('⚠️  MongoDB connection timeout - continuing without MongoDB');
+      }, 5000);
+      
+      await MongoConnection.getInstance().connect();
+      clearTimeout(mongoTimeout);
+      // eslint-disable-next-line no-console
+      console.log('✅ MongoDB connected');
+
+      // Initialize document worker
+      // eslint-disable-next-line no-console
+      console.log('🔄 Starting document worker...');
+      const worker = DocumentWorker.getInstance();
+      void worker.start();
+      // eslint-disable-next-line no-console
+      console.log('✅ Document worker started');
+      
+    } catch (error) {
+      // eslint-disable-next-line no-console
+      console.log('⚠️  Connection initialization failed - server running without full functionality');
+      // eslint-disable-next-line no-console
+      console.log('Error:', error instanceof Error ? error.message : error);
     }
   }
 
@@ -169,7 +206,7 @@ class Application {
 const application = new Application();
 
 // Graceful shutdown handlers
-process.on('SIGTERM', () => {
+process.on('SIGTERM', (): void => {
   const nodeEnv = process.env['NODE_ENV'] ?? 'development';
   if (nodeEnv === 'development') {
     // eslint-disable-next-line no-console
@@ -188,15 +225,6 @@ process.on('SIGINT', () => {
 });
 
 // Start server
-try {
-  application.start();
-} catch (error) {
-  const nodeEnv = process.env['NODE_ENV'] ?? 'development';
-  if (nodeEnv === 'development') {
-    // eslint-disable-next-line no-console
-    console.error('Failed to start application:', error);
-  }
-  process.exit(1);
-}
+void application.start();
 
 export { Application };

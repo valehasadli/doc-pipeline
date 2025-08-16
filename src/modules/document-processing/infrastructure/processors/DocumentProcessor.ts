@@ -1,3 +1,4 @@
+import { DocumentService } from '@document-processing/application/services/DocumentService';
 import { Document, IOCRResult, IValidationResult } from '@document-processing/domain/entities/Document';
 
 /**
@@ -6,8 +7,11 @@ import { Document, IOCRResult, IValidationResult } from '@document-processing/do
  */
 export class DocumentProcessor {
   private static instance: DocumentProcessor | undefined;
+  private readonly documentService: DocumentService;
 
-  private constructor() {}
+  private constructor() {
+    this.documentService = DocumentService.getInstance();
+  }
 
   /**
    * Get singleton instance
@@ -30,11 +34,17 @@ export class DocumentProcessor {
       // Simulate OCR processing (as per interview requirements)
       const ocrResult = await this.simulateOCR(document);
       
-      // Complete OCR processing
+      // Complete OCR processing with results
       document.completeOCRProcessing(ocrResult);
+      
+      // Update document in database
+      await this.documentService.updateDocument(document);
     } catch (error) {
-      // Fail OCR processing
+      // Mark OCR as failed
       document.failOCRProcessing();
+      
+      // Update document in database
+      await this.documentService.updateDocument(document);
       throw error;
     }
   }
@@ -52,9 +62,15 @@ export class DocumentProcessor {
       
       // Complete validation processing
       document.completeValidationProcessing(validationResult);
+      
+      // Update document in database
+      await this.documentService.updateDocument(document);
     } catch (error) {
-      // Fail validation processing
+      // Mark validation as failed
       document.failValidationProcessing();
+      
+      // Update document in database
+      await this.documentService.updateDocument(document);
       throw error;
     }
   }
@@ -72,9 +88,15 @@ export class DocumentProcessor {
       
       // Complete persistence processing
       document.completePersistenceProcessing();
+      
+      // Update document in database
+      await this.documentService.updateDocument(document);
     } catch (error) {
-      // Fail persistence processing
+      // Mark persistence as failed
       document.failPersistenceProcessing();
+      
+      // Update document in database
+      await this.documentService.updateDocument(document);
       throw error;
     }
   }

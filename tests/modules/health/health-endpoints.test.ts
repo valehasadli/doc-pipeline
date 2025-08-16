@@ -1,5 +1,5 @@
-import request from 'supertest';
 import express from 'express';
+import request from 'supertest';
 
 import { createHealthRoutes } from '@health/presentation/routes';
 
@@ -55,10 +55,11 @@ describe('Health Endpoints', () => {
       // Each service should have proper structure
       Object.values(services).forEach((service: unknown) => {
         expect(service).toHaveProperty('status');
-        expect(service).toHaveProperty('status');
-        if (typeof service === 'object' && service !== null && 'status' in service) {
-          expect(['up', 'down']).toContain((service as { status: string }).status);
-        }
+        expect(service).toHaveProperty('responseTime');
+        
+        const serviceObj = service as { status: string; responseTime: number };
+        expect(['up', 'down']).toContain(serviceObj.status);
+        expect(typeof serviceObj.responseTime).toBe('number');
       });
     });
   });

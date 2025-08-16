@@ -58,11 +58,8 @@ describe('HealthService', () => {
       const allServicesUp = Object.values(healthStatus.services)
         .every((service: IServiceHealth) => service.status === 'up');
       
-      if (allServicesUp) {
-        expect(healthStatus.status).toBe('healthy');
-      } else {
-        expect(healthStatus.status).toBe('unhealthy');
-      }
+      const expectedStatus = allServicesUp ? 'healthy' : 'unhealthy';
+      expect(healthStatus.status).toBe(expectedStatus);
     });
   });
 

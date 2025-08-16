@@ -53,14 +53,16 @@ export class Document {
     id: string,
     filePath: string,
     metadata: IDocumentMetadata,
-    status: DocumentStatus = DocumentStatus.UPLOADED
+    status: DocumentStatus = DocumentStatus.UPLOADED,
+    createdAt?: Date,
+    updatedAt?: Date
   ) {
     this.documentId = id;
     this.documentFilePath = filePath;
     this.documentMetadata = metadata;
     this.documentStatus = status;
-    this.documentCreatedAt = new Date();
-    this.documentUpdatedAt = new Date();
+    this.documentCreatedAt = createdAt ?? new Date();
+    this.documentUpdatedAt = updatedAt ?? new Date();
   }
 
   // Getters
@@ -73,7 +75,7 @@ export class Document {
   }
 
   public get metadata(): IDocumentMetadata {
-    return this.documentMetadata;
+    return { ...this.documentMetadata };
   }
 
   public get status(): DocumentStatus {
@@ -81,11 +83,14 @@ export class Document {
   }
 
   public get ocrResult(): IOCRResult | undefined {
-    return this.documentOcrResult;
+    return this.documentOcrResult ? { ...this.documentOcrResult } : undefined;
   }
 
   public get validationResult(): IValidationResult | undefined {
-    return this.documentValidationResult;
+    return this.documentValidationResult ? {
+      ...this.documentValidationResult,
+      errors: [...this.documentValidationResult.errors]
+    } : undefined;
   }
 
   public get createdAt(): Date {
@@ -155,7 +160,10 @@ export class Document {
     if (this.documentStatus !== DocumentStatus.PROCESSING_VALIDATION) {
       throw new Error(`Cannot complete validation processing. Current status: ${this.documentStatus}`);
     }
-    this.documentValidationResult = { ...validationResult };
+    this.documentValidationResult = { 
+      ...validationResult, 
+      errors: [...validationResult.errors] 
+    };
     this.documentStatus = DocumentStatus.VALIDATION_COMPLETED;
     this.documentUpdatedAt = new Date();
   }
@@ -243,7 +251,10 @@ export class Document {
       metadata: { ...this.documentMetadata },
       status: this.documentStatus,
       ocrResult: this.documentOcrResult ? { ...this.documentOcrResult } : undefined,
-      validationResult: this.documentValidationResult ? { ...this.documentValidationResult } : undefined,
+      validationResult: this.documentValidationResult ? { 
+        ...this.documentValidationResult, 
+        errors: [...this.documentValidationResult.errors] 
+      } : undefined,
       createdAt: new Date(this.documentCreatedAt),
       updatedAt: new Date(this.documentUpdatedAt)
     };

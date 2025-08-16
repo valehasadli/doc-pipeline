@@ -1,12 +1,9 @@
-import * as path from 'path';
-
 import { Job } from 'bullmq';
 
-import { Document, IDocumentMetadata } from '@document-processing/domain/entities/Document';
-import { DocumentStatus } from '@document-processing/domain/enums/DocumentStatus';
+import { DocumentService } from '@document-processing/application/services/DocumentService';
 
-import { getDocumentProcessor } from '../processors/DocumentProcessor';
-import { getDocumentQueue, IDocumentJobData } from '../queue/DocumentQueue';
+import { DocumentProcessor } from '../processors/DocumentProcessor';
+import { DocumentQueue, IDocumentJobData } from '../queue/DocumentQueue';
 
 /**
  * Simple document worker that processes jobs using BullMQ
@@ -14,10 +11,15 @@ import { getDocumentQueue, IDocumentJobData } from '../queue/DocumentQueue';
  */
 export class DocumentWorker {
   private static instance: DocumentWorker | undefined;
-  private readonly queue = getDocumentQueue();
-  private readonly processor = getDocumentProcessor();
+  private readonly queue: DocumentQueue;
+  private readonly processor: DocumentProcessor;
+  private readonly documentService: DocumentService;
 
-  private constructor() {}
+  private constructor() {
+    this.queue = DocumentQueue.getInstance();
+    this.processor = DocumentProcessor.getInstance();
+    this.documentService = DocumentService.getInstance();
+  }
 
   /**
    * Get singleton instance
@@ -45,70 +47,32 @@ export class DocumentWorker {
   private async processJob(job: Job<IDocumentJobData>): Promise<void> {
     const { documentId, filePath, stage } = job.data;
 
-    // Create or retrieve document (in real app, this would come from database)
-    const document = this.getOrCreateDocument(documentId, filePath);
+    // Retrieve document from database
+    const domainDocument = await this.documentService.findById(documentId);
+    if (domainDocument === null) {
+      throw new Error(`Document ${documentId} not found in repository`);
+    }
 
     // Process based on stage
     switch (stage) {
       case 'ocr':
-        await this.processor.processOCR(document);
+        await this.processor.processOCR(domainDocument);
         // Queue next stage
         await this.queue.addValidationJob(documentId, filePath);
         break;
-
       case 'validation':
-        await this.processor.processValidation(document);
+        await this.processor.processValidation(domainDocument);
         // Queue next stage
         await this.queue.addPersistenceJob(documentId, filePath);
         break;
-
       case 'persistence':
-        await this.processor.processPersistence(document);
+        await this.processor.processPersistence(domainDocument);
+        // Processing complete
         break;
-
       default:
-        throw new Error(`Unknown processing stage: ${String(stage)}`);
+        throw new Error(`Unknown processing stage: ${stage as string}`);
     }
 
-  }
-
-  /**
-   * Get or create document instance
-   * In a real application, this would retrieve from database
-   */
-  private getOrCreateDocument(documentId: string, filePath: string): Document {
-    // For now, create a new document instance
-    // In real app, this would be retrieved from database with current state
-    const fileName = filePath.split('/').pop() ?? 'unknown';
-    const metadata: IDocumentMetadata = {
-      fileName,
-      fileSize: 1024, // Would get actual file size
-      mimeType: this.getMimeType(filePath),
-      uploadedAt: new Date(),
-    };
-
-    return new Document(documentId, filePath, metadata, DocumentStatus.UPLOADED);
-  }
-
-  /**
-   * Simple MIME type detection based on file extension
-   */
-  private getMimeType(filePath: string): string {
-    const extension = path.extname(filePath).toLowerCase() || '.unknown';
-    
-    switch (extension) {
-      case '.pdf':
-        return 'application/pdf';
-      case '.txt':
-        return 'text/plain';
-      case '.jpg':
-      case '.jpeg':
-        return 'image/jpeg';
-      case '.png':
-        return 'image/png';
-      default:
-        return 'application/octet-stream';
-    }
   }
 
   /**

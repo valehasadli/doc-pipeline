@@ -87,6 +87,18 @@ export class DocumentQueue {
   }
 
   /**
+   * Cancel job by document ID
+   */
+  public async cancelJob(documentId: string): Promise<void> {
+    const jobs = await this.queue.getJobs(['waiting', 'active', 'delayed']);
+    const jobsToCancel = jobs.filter(job => job.data.documentId === documentId);
+    
+    for (const job of jobsToCancel) {
+      await job.remove();
+    }
+  }
+
+  /**
    * Create worker for processing jobs
    */
   public createWorker(

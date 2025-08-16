@@ -53,6 +53,20 @@ module.exports = {
     '@typescript-eslint/naming-convention': [
       'error',
       {
+        selector: 'default',
+        format: ['camelCase'],
+        leadingUnderscore: 'allow',
+        trailingUnderscore: 'allow',
+      },
+      {
+        selector: 'variable',
+        format: ['camelCase', 'UPPER_CASE', 'PascalCase'],
+      },
+      {
+        selector: 'typeLike',
+        format: ['PascalCase'],
+      },
+      {
         selector: 'interface',
         format: ['PascalCase'],
         prefix: ['I'],
@@ -66,16 +80,24 @@ module.exports = {
         format: ['PascalCase'],
       },
       {
-        selector: 'class',
-        format: ['PascalCase'],
+        selector: 'enumMember',
+        format: ['UPPER_CASE'],
       },
       {
-        selector: 'method',
-        format: ['camelCase'],
+        selector: 'objectLiteralProperty',
+        format: null,
+        filter: {
+          regex: '^(_id|\\$.*|metadata\\..*|INITIAL|PROCESSING|SUCCESS|ERROR|TERMINAL)$',
+          match: true,
+        },
       },
       {
-        selector: 'property',
-        format: ['camelCase', 'UPPER_CASE'],
+        selector: 'typeProperty',
+        format: null,
+        filter: {
+          regex: '^(_id|\\$.*|metadata\\..*)$',
+          match: true,
+        },
       },
     ],
 
