@@ -13,6 +13,7 @@ export interface IDocumentRepository extends IRepository<Document> {
   findByStatuses(statuses: DocumentStatus[]): Promise<Document[]>;
   findAll(): Promise<Document[]>;
   exists(id: string): Promise<boolean>;
+  update(document: Document): Promise<void>;
   getStatistics(): Promise<{
     total: number;
     byStatus: Record<DocumentStatus, number>;
