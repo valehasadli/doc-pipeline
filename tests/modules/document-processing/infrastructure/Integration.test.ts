@@ -110,6 +110,12 @@ describe('Document Processing Infrastructure Integration', () => {
         documentId,
         filePath,
         stage: 'ocr',
+      }, {
+        attempts: 3,
+        backoff: {
+          type: 'exponential',
+          delay: 2000,
+        },
       });
 
       // Add validation job
@@ -119,6 +125,12 @@ describe('Document Processing Infrastructure Integration', () => {
         documentId,
         filePath,
         stage: 'validation',
+      }, {
+        attempts: 3,
+        backoff: {
+          type: 'exponential',
+          delay: 2000,
+        },
       });
 
       // Add persistence job
@@ -128,6 +140,12 @@ describe('Document Processing Infrastructure Integration', () => {
         documentId,
         filePath,
         stage: 'persistence',
+      }, {
+        attempts: 5,
+        backoff: {
+          type: 'exponential',
+          delay: 3000,
+        },
       });
     });
 

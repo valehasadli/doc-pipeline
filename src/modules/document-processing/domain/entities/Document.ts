@@ -183,7 +183,8 @@ export class Document {
    * Start persistence processing
    */
   public startPersistenceProcessing(): void {
-    if (this.documentStatus !== DocumentStatus.VALIDATION_COMPLETED) {
+    if (this.documentStatus !== DocumentStatus.VALIDATION_COMPLETED && 
+        this.documentStatus !== DocumentStatus.PERSISTENCE_FAILED) {
       throw new Error(`Cannot start persistence processing. Current status: ${this.documentStatus}`);
     }
     this.documentStatus = DocumentStatus.PROCESSING_PERSISTENCE;

@@ -7,6 +7,7 @@ export interface IDocumentJobData {
   documentId: string;
   filePath: string;
   stage: 'ocr' | 'validation' | 'persistence';
+  cancelled?: boolean;
 }
 
 /**
@@ -61,6 +62,12 @@ export class DocumentQueue {
       documentId,
       filePath,
       stage: 'ocr',
+    }, {
+      attempts: 3, // Retry up to 3 times for OCR failures
+      backoff: {
+        type: 'exponential',
+        delay: 2000, // Start with 2 second delay
+      },
     });
   }
 
@@ -72,6 +79,12 @@ export class DocumentQueue {
       documentId,
       filePath,
       stage: 'validation',
+    }, {
+      attempts: 3, // Retry up to 3 times for validation failures
+      backoff: {
+        type: 'exponential',
+        delay: 2000, // Start with 2 second delay
+      },
     });
   }
 
@@ -83,18 +96,67 @@ export class DocumentQueue {
       documentId,
       filePath,
       stage: 'persistence',
+    }, {
+      attempts: 5, // Retry up to 5 times for persistence failures
+      backoff: {
+        type: 'exponential',
+        delay: 3000, // Start with 3 second delay, exponentially increase
+      },
     });
   }
 
   /**
-   * Cancel job by document ID
+   * Cancel job by document ID (including active jobs)
    */
   public async cancelJob(documentId: string): Promise<void> {
     const jobs = await this.queue.getJobs(['waiting', 'active', 'delayed']);
     const jobsToCancel = jobs.filter(job => job.data.documentId === documentId);
     
+    if (jobsToCancel.length === 0) {
+      throw new Error(`No jobs found for document ${documentId}`);
+    }
+
+    const errors: string[] = [];
+    let cancelledCount = 0;
+
     for (const job of jobsToCancel) {
-      await job.remove();
+      try {
+        // For active jobs, try to move them to failed state first
+        if (await job.isActive()) {
+          await job.moveToFailed(new Error('Job cancelled by user'), '0');
+          cancelledCount++;
+        } else {
+          // For waiting/delayed jobs, remove them normally
+          await job.remove();
+          cancelledCount++;
+        }
+      } catch (error) {
+        // If job is locked and we can't move it to failed, try alternative approach
+        if (error instanceof Error && error.message.includes('locked')) {
+          try {
+            // Mark job as failed to signal cancellation to worker
+            await job.updateData({ ...job.data, cancelled: true });
+            // eslint-disable-next-line no-console
+            console.log(`Marked job ${job.id} for cancellation - worker will handle gracefully`);
+            cancelledCount++;
+          } catch (updateError) {
+            errors.push(`Job ${job.id} is currently being processed and cannot be cancelled`);
+          }
+        } else {
+          errors.push(`Failed to cancel job ${job.id}: ${error instanceof Error ? error.message : 'Unknown error'}`);
+        }
+      }
+    }
+
+    // If we couldn't cancel any jobs, throw an error
+    if (cancelledCount === 0) {
+      throw new Error(`Failed to cancel document: ${errors.join(', ')}`);
+    }
+
+    // If some jobs were cancelled but others failed, log warnings but don't throw
+    if (errors.length > 0) {
+      // eslint-disable-next-line no-console
+      console.warn(`Partial cancellation for document ${documentId}: ${errors.join(', ')}`);
     }
   }
 
@@ -116,7 +178,7 @@ export class DocumentQueue {
     // Basic error handling
     worker.on('failed', (job, err) => {
       // eslint-disable-next-line no-console
-      console.error(`Job ${job?.id} failed for document ${job?.data?.documentId}:`, err);
+      console.error(`Job ${job?.id ?? 'unknown'} failed for document ${job?.data.documentId ?? 'unknown'}:`, err);
     });
 
     worker.on('completed', (job) => {

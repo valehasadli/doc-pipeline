@@ -45,7 +45,12 @@ export class DocumentWorker {
    * Process a single job
    */
   private async processJob(job: Job<IDocumentJobData>): Promise<void> {
-    const { documentId, filePath, stage } = job.data;
+    const { documentId, filePath, stage, cancelled } = job.data;
+
+    // Check if job was marked for cancellation
+    if (cancelled === true) {
+      throw new Error(`Job cancelled by user request`);
+    }
 
     // Retrieve document from database
     const domainDocument = await this.documentService.findById(documentId);

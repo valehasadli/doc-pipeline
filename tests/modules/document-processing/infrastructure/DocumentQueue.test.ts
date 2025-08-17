@@ -74,6 +74,12 @@ describe('DocumentQueue', () => {
         documentId,
         filePath,
         stage: 'ocr',
+      }, {
+        attempts: 3,
+        backoff: {
+          type: 'exponential',
+          delay: 2000,
+        },
       });
       expect(result).toBe(mockJob);
     });
@@ -91,6 +97,12 @@ describe('DocumentQueue', () => {
         documentId,
         filePath,
         stage: 'validation',
+      }, {
+        attempts: 3,
+        backoff: {
+          type: 'exponential',
+          delay: 2000,
+        },
       });
       expect(result).toBe(mockJob);
     });
@@ -108,6 +120,12 @@ describe('DocumentQueue', () => {
         documentId,
         filePath,
         stage: 'persistence',
+      }, {
+        attempts: 5,
+        backoff: {
+          type: 'exponential',
+          delay: 3000,
+        },
       });
       expect(result).toBe(mockJob);
     });

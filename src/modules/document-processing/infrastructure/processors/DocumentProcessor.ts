@@ -83,19 +83,16 @@ export class DocumentProcessor {
     document.startPersistenceProcessing();
 
     try {
-      // Persist document (simulate database save)
-      await this.persistDocument();
-      
-      // Complete persistence processing
+      // Complete persistence processing (just mark as completed)
       document.completePersistenceProcessing();
       
-      // Update document in database
+      // Update document status in database
       await this.documentService.updateDocument(document);
     } catch (error) {
       // Mark persistence as failed
       document.failPersistenceProcessing();
       
-      // Update document in database
+      // Update document status in database
       await this.documentService.updateDocument(document);
       throw error;
     }
@@ -178,22 +175,6 @@ export class DocumentProcessor {
     };
   }
 
-  /**
-   * Persist document to storage (simulated)
-   */
-  private async persistDocument(): Promise<void> {
-    // Simulate database save delay
-    await this.delay(200 + Math.random() * 500); // 0.2-0.7 seconds
-
-    // In a real implementation, this would save to MongoDB
-    // For now, we'll just simulate the persistence
-    
-    // Simulate potential database error (5% chance)
-    if (Math.random() < 0.05) {
-      throw new Error('Database connection failed');
-    }
-
-  }
 
   /**
    * Utility method to simulate processing delays
