@@ -142,6 +142,11 @@ export class Document {
     this.documentUpdatedAt = new Date();
   }
 
+  public markAsCancelled(): void {
+    this.documentStatus = DocumentStatus.CANCELLED;
+    this.documentUpdatedAt = new Date();
+  }
+
   /**
    * Start validation processing
    */

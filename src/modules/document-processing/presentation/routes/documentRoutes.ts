@@ -2,7 +2,7 @@ import { Router, Request, Response } from 'express';
 
 import { DocumentController } from '@document-processing/presentation/controllers/DocumentController';
 import { handleMulterErrors, handleGlobalErrors, asyncHandler } from '@document-processing/presentation/middleware/errorHandler';
-import { uploadMiddleware } from '@document-processing/presentation/middleware/uploadMiddleware';
+import { upload } from '@document-processing/presentation/middleware/uploadMiddleware';
 import { validateDocumentId, validateStatusQuery, validatePaginationQuery } from '@document-processing/presentation/middleware/validation';
 
 /**
@@ -14,7 +14,7 @@ export function createDocumentRoutes(): Router {
 
   // Upload document with file validation
   router.post('/upload', 
-    uploadMiddleware.single('file'),
+    upload.single('file'),
     handleMulterErrors,
     asyncHandler(async (req: Request, res: Response) => {
       await documentController.uploadDocument(req, res);

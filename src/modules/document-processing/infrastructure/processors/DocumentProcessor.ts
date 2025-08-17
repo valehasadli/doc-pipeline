@@ -1,5 +1,9 @@
+
 import { DocumentService } from '@document-processing/application/services/DocumentService';
 import { Document, IOCRResult, IValidationResult } from '@document-processing/domain/entities/Document';
+import { DocumentStatus } from '@document-processing/domain/enums/DocumentStatus';
+import { IFileStorageProvider } from '@document-processing/infrastructure/storage/interfaces/IFileStorageProvider';
+import { StorageProviderFactory } from '@document-processing/infrastructure/storage/StorageProviderFactory';
 
 /**
  * Simple document processor for OCR, validation, and persistence
@@ -8,9 +12,11 @@ import { Document, IOCRResult, IValidationResult } from '@document-processing/do
 export class DocumentProcessor {
   private static instance: DocumentProcessor | undefined;
   private readonly documentService: DocumentService;
+  private readonly storageProvider: IFileStorageProvider;
 
   private constructor() {
     this.documentService = DocumentService.getInstance();
+    this.storageProvider = StorageProviderFactory.create();
   }
 
   /**
@@ -31,7 +37,7 @@ export class DocumentProcessor {
     document.startOCRProcessing();
 
     try {
-      // Simulate OCR processing (as per interview requirements)
+      // Simulate OCR processing
       const ocrResult = await this.simulateOCR(document);
       
       // Complete OCR processing with results
@@ -40,8 +46,18 @@ export class DocumentProcessor {
       // Update document in database
       await this.documentService.updateDocument(document);
     } catch (error) {
-      // Mark OCR as failed
-      document.failOCRProcessing();
+      // Check if this is a cancellation error
+      const isCancellation = error instanceof Error && error.message.includes('cancelled');
+      
+      if (isCancellation) {
+        // Mark document as cancelled
+        document.markAsCancelled();
+      } else {
+        // Mark OCR as failed for actual processing errors
+        document.failOCRProcessing();
+      }
+      
+      // Files stay in temp folder on failure/cancellation
       
       // Update document in database
       await this.documentService.updateDocument(document);
@@ -66,8 +82,18 @@ export class DocumentProcessor {
       // Update document in database
       await this.documentService.updateDocument(document);
     } catch (error) {
-      // Mark validation as failed
-      document.failValidationProcessing();
+      // Check if this is a cancellation error
+      const isCancellation = error instanceof Error && error.message.includes('cancelled');
+      
+      if (isCancellation) {
+        // Mark document as cancelled
+        document.markAsCancelled();
+      } else {
+        // Mark validation as failed for actual processing errors
+        document.failValidationProcessing();
+      }
+      
+      // Files stay in temp folder on failure/cancellation
       
       // Update document in database
       await this.documentService.updateDocument(document);
@@ -83,14 +109,27 @@ export class DocumentProcessor {
     document.startPersistenceProcessing();
 
     try {
-      // Complete persistence processing (just mark as completed)
+      // Move file from temporary to permanent storage
+      await this.moveFileToPermStorage(document);
+      
+      // Complete persistence processing
       document.completePersistenceProcessing();
       
       // Update document status in database
       await this.documentService.updateDocument(document);
     } catch (error) {
-      // Mark persistence as failed
-      document.failPersistenceProcessing();
+      // Check if this is a cancellation error
+      const isCancellation = error instanceof Error && error.message.includes('cancelled');
+      
+      if (isCancellation) {
+        // Mark document as cancelled
+        document.markAsCancelled();
+      } else {
+        // Mark persistence as failed for actual processing errors
+        document.failPersistenceProcessing();
+      }
+      
+      // Files stay in temp folder on failure/cancellation
       
       // Update document status in database
       await this.documentService.updateDocument(document);
@@ -98,14 +137,82 @@ export class DocumentProcessor {
     }
   }
 
+
+  /**
+   * Move file from temp to permanent storage
+   */
+  private async moveFileToPermStorage(document: Document): Promise<void> {
+    const tempPath = this.getRelativePath(document.filePath);
+    const permPath = this.generatePermPath(document);
+    
+    // File already in permanent storage
+    if (await this.storageProvider.exists(permPath)) {
+      return;
+    }
+
+    // Move with retry
+    await this.retryOperation(() => this.storageProvider.move(tempPath, permPath));
+    
+    // Verify move succeeded
+    if (!(await this.storageProvider.exists(permPath))) {
+      throw new Error('File move failed verification');
+    }
+  }
+
+  /**
+   * Retry operation with exponential backoff
+   */
+  private async retryOperation<T>(operation: () => Promise<T>): Promise<T> {
+    const maxRetries = 3;
+    const baseDelay = 1000;
+    
+    for (let attempt = 1; attempt <= maxRetries; attempt++) {
+      try {
+        return await operation();
+      } catch (error) {
+        if (attempt === maxRetries) throw error;
+        await this.delay(baseDelay * Math.pow(2, attempt - 1));
+      }
+    }
+    throw new Error('Retry operation failed');
+  }
+
+  /**
+   * Get relative path for storage provider
+   */
+  private getRelativePath(filePath: string): string {
+    return filePath.replace(/^uploads\//, '');
+  }
+
+  /**
+   * Generate permanent storage path
+   */
+  private generatePermPath(document: Document): string {
+    const filename = document.filePath.split('/').pop() ?? 'unknown';
+    return `permanent/${document.id}_${filename}`;
+  }
+
+
   /**
    * Simulate OCR processing (as required by interview)
    */
   private async simulateOCR(document: Document): Promise<IOCRResult> {
-    // Simulate processing delay (configurable via env)
-    const ocrDelayMs = parseInt(process.env['OCR_SIMULATION_DELAY_MS'] ?? '60000', 10);
-    await this.delay(ocrDelayMs);
+    // Check if document was cancelled before processing
+    const currentDoc = await this.documentService.findById(document.id);
+    if (currentDoc?.status === DocumentStatus.FAILED || currentDoc?.status === DocumentStatus.CANCELLED) {
+      throw new Error(`Document ${document.id} was cancelled during OCR processing`);
+    }
 
+    // Simulate processing delay (configurable via env)
+    const processingDelayMs = parseInt(process.env['OCR_PROCESSING_DELAY_MS'] ?? '1000', 10);
+    await this.delay(processingDelayMs, document.id);
+    
+    // Check again after delay in case it was cancelled during processing
+    const updatedDoc = await this.documentService.findById(document.id);
+    if (updatedDoc?.status === DocumentStatus.FAILED || updatedDoc?.status === DocumentStatus.CANCELLED) {
+      throw new Error(`Document ${document.id} was cancelled during OCR processing`);
+    }
+    
     // Simulate OCR based on file type
     const mimeType = document.metadata.mimeType;
     let extractedText = '';
@@ -136,9 +243,21 @@ export class DocumentProcessor {
    * Validate document content
    */
   private async validateDocument(document: Document): Promise<IValidationResult> {
+    // Check if document was cancelled before processing
+    const currentDoc = await this.documentService.findById(document.id);
+    if (currentDoc?.status === DocumentStatus.FAILED || currentDoc?.status === DocumentStatus.CANCELLED) {
+      throw new Error(`Document ${document.id} was cancelled during validation processing`);
+    }
+
     // Simulate validation delay (configurable via env)
     const validationDelayMs = parseInt(process.env['VALIDATION_SIMULATION_DELAY_MS'] ?? '60000', 10);
-    await this.delay(validationDelayMs);
+    await this.delay(validationDelayMs, document.id);
+    
+    // Check again after delay in case it was cancelled during processing
+    const updatedDoc = await this.documentService.findById(document.id);
+    if (updatedDoc?.status === DocumentStatus.FAILED || updatedDoc?.status === DocumentStatus.CANCELLED) {
+      throw new Error(`Document ${document.id} was cancelled during validation processing`);
+    }
 
     const ocrResult = document.ocrResult;
     if (!ocrResult) {
@@ -177,10 +296,40 @@ export class DocumentProcessor {
 
 
   /**
-   * Utility method to simulate processing delays
+   * Utility method to simulate processing delays with cancellation checks
    */
-  private delay(ms: number): Promise<void> {
-    return new Promise(resolve => setTimeout(resolve, ms));
+  private async delay(ms: number, documentId?: string): Promise<void> {
+    if (!documentId || documentId.trim() === '') {
+      return new Promise(resolve => setTimeout(resolve, ms));
+    }
+
+    return new Promise((resolve, reject) => {
+      const startTime = Date.now();
+      
+      const checkCancellation = async (): Promise<void> => {
+        try {
+          const document = await this.documentService.findById(documentId);
+          if (document?.status === DocumentStatus.FAILED || document?.status === DocumentStatus.CANCELLED) {
+            reject(new Error(`Document ${documentId} was cancelled during processing`));
+            return;
+          }
+          
+          const elapsed = Date.now() - startTime;
+          if (elapsed >= ms) {
+            resolve();
+          } else {
+            // Check again in 1 second or when delay should complete, whichever is sooner
+            const nextCheck = Math.min(1000, ms - elapsed);
+            setTimeout(() => { void checkCancellation(); }, nextCheck);
+          }
+        } catch (error) {
+          reject(error);
+        }
+      };
+      
+      // Start the first check
+      void checkCancellation();
+    });
   }
 }
 

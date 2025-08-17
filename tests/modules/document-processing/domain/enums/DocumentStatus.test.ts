@@ -215,14 +215,16 @@ describe('Document Status Enum', () => {
       expect(STATUS_CATEGORIES.ERROR).toContain(DocumentStatus.VALIDATION_FAILED);
       expect(STATUS_CATEGORIES.ERROR).toContain(DocumentStatus.PERSISTENCE_FAILED);
       expect(STATUS_CATEGORIES.ERROR).toContain(DocumentStatus.FAILED);
-      expect(STATUS_CATEGORIES.ERROR).toHaveLength(4);
+      expect(STATUS_CATEGORIES.ERROR).toContain(DocumentStatus.CANCELLED);
+      expect(STATUS_CATEGORIES.ERROR).toHaveLength(5);
     });
 
     it('should have correct terminal statuses', () => {
       expect(STATUS_CATEGORIES.TERMINAL).toContain(DocumentStatus.COMPLETED);
       expect(STATUS_CATEGORIES.TERMINAL).toContain(DocumentStatus.FAILED);
+      expect(STATUS_CATEGORIES.TERMINAL).toContain(DocumentStatus.CANCELLED);
       expect(STATUS_CATEGORIES.TERMINAL).toContain(DocumentStatus.DEAD_LETTER);
-      expect(STATUS_CATEGORIES.TERMINAL).toHaveLength(3);
+      expect(STATUS_CATEGORIES.TERMINAL).toHaveLength(4);
     });
   });
 

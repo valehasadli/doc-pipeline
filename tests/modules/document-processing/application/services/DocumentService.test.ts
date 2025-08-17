@@ -315,7 +315,7 @@ describe('DocumentService', () => {
       const uploadResult = await documentService.uploadDocument(mockUploadRequest);
 
       await expect(documentService.retryDocument(uploadResult.documentId))
-        .rejects.toThrow('Can only retry failed documents');
+        .rejects.toThrow('Can only retry failed or cancelled documents');
     });
   });
 

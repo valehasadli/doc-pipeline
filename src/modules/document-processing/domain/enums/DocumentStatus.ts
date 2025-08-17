@@ -29,6 +29,9 @@ export enum DocumentStatus {
   PERSISTENCE_FAILED = 'persistence_failed',
   FAILED = 'failed',
   
+  // Cancellation state
+  CANCELLED = 'cancelled',
+  
   // Dead letter queue
   DEAD_LETTER = 'dead_letter',
 }
@@ -97,12 +100,13 @@ export const VALID_STATUS_TRANSITIONS: Record<DocumentStatus, DocumentStatus[]> 
   
   // Terminal states
   [DocumentStatus.COMPLETED]: [], // No transitions from completed
-  [DocumentStatus.FAILED]: [
-    DocumentStatus.QUEUED, // Manual retry from beginning
-  ],
-  [DocumentStatus.DEAD_LETTER]: [
-    DocumentStatus.QUEUED, // Manual recovery
-  ],
+  [DocumentStatus.FAILED]: [DocumentStatus.QUEUED], // Can retry failed documents
+  
+  // Cancellation state
+  [DocumentStatus.CANCELLED]: [DocumentStatus.QUEUED], // Can retry cancelled documents
+  
+  // Dead letter queue
+  [DocumentStatus.DEAD_LETTER]: [DocumentStatus.QUEUED], // Can retry from dead letter
 };
 
 /**
@@ -125,10 +129,12 @@ export const STATUS_CATEGORIES = {
     DocumentStatus.VALIDATION_FAILED,
     DocumentStatus.PERSISTENCE_FAILED,
     DocumentStatus.FAILED,
+    DocumentStatus.CANCELLED,
   ],
   TERMINAL: [
     DocumentStatus.COMPLETED,
     DocumentStatus.FAILED,
+    DocumentStatus.CANCELLED,
     DocumentStatus.DEAD_LETTER,
   ],
 } as const;

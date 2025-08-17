@@ -106,7 +106,7 @@ describe('DocumentController', () => {
 
       expect(response.body).toEqual({
         error: 'Invalid status filter',
-        message: 'Status must be one of: uploaded, queued, processing_ocr, processing_validation, processing_persistence, ocr_completed, validation_completed, completed, ocr_failed, validation_failed, persistence_failed, failed, dead_letter'
+        message: 'Status must be one of: uploaded, queued, processing_ocr, processing_validation, processing_persistence, ocr_completed, validation_completed, completed, ocr_failed, validation_failed, persistence_failed, failed, cancelled, dead_letter'
       });
     });
 

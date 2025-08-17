@@ -10,6 +10,7 @@ export interface IDocumentRepository {
   save(document: Document): Promise<void>;
   findById(id: string): Promise<Document | null>;
   findByStatus(status: DocumentStatus): Promise<Document[]>;
+  findByStatuses(statuses: DocumentStatus[]): Promise<Document[]>;
   findAll(): Promise<Document[]>;
   update(document: Document): Promise<void>;
   delete(id: string): Promise<void>;
@@ -62,6 +63,15 @@ export class MongoDocumentRepository implements IDocumentRepository {
    */
   public async findByStatus(status: DocumentStatus): Promise<Document[]> {
     const docs = await DocumentModel.find({ status }).sort({ createdAt: -1 }).exec();
+    
+    return docs.map(doc => this.mapToDocument(doc));
+  }
+
+  /**
+   * Find documents by multiple statuses
+   */
+  public async findByStatuses(statuses: DocumentStatus[]): Promise<Document[]> {
+    const docs = await DocumentModel.find({ status: { $in: statuses } }).sort({ createdAt: -1 }).exec();
     
     return docs.map(doc => this.mapToDocument(doc));
   }

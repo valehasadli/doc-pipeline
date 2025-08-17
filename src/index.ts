@@ -183,11 +183,13 @@ class Application {
 
       // Initialize document worker
       // eslint-disable-next-line no-console
-      console.log('🔄 Starting document worker...');
+      console.log('🔄 \x1b[34mStarting document worker...\x1b[0m');
       const worker = DocumentWorker.getInstance();
       void worker.start();
       // eslint-disable-next-line no-console
-      console.log('✅ Document worker started');
+      console.log('✅ \x1b[32mDocument worker started\x1b[0m');
+
+      // No cleanup services - files stay in temp/permanent folders
       
     } catch (error) {
       // eslint-disable-next-line no-console

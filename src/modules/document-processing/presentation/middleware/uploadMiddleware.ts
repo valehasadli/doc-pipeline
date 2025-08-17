@@ -1,14 +1,20 @@
+import path from 'path';
+
 import multer from 'multer';
 
 /**
  * Multer configuration for file uploads
  * Handles file type validation and upload constraints at presentation layer
  */
-const localStoragePath = process.env['LOCAL_STORAGE_PATH'] ?? 'uploads/';
 const maxFileSize = parseInt(process.env['MAX_FILE_SIZE'] ?? '10485760', 10);
 
-export const uploadMiddleware = multer({
-  dest: localStoragePath,
+const upload = multer({
+  storage: multer.diskStorage({
+    destination: (_req, _file, cb) => {
+      const uploadPath = path.join(process.env['LOCAL_STORAGE_PATH'] ?? './uploads', 'temp');
+      cb(null, uploadPath);
+    },
+  }),
   limits: {
     fileSize: maxFileSize,
   },
@@ -31,3 +37,5 @@ export const uploadMiddleware = multer({
     }
   }
 });
+
+export { upload };

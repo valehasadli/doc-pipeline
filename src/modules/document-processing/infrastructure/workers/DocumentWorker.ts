@@ -1,9 +1,9 @@
 import { Job } from 'bullmq';
 
 import { DocumentService } from '@document-processing/application/services/DocumentService';
-
-import { DocumentProcessor } from '../processors/DocumentProcessor';
-import { DocumentQueue, IDocumentJobData } from '../queue/DocumentQueue';
+import { DocumentStatus } from '@document-processing/domain/enums/DocumentStatus';
+import { DocumentProcessor } from '@document-processing/infrastructure/processors/DocumentProcessor';
+import { DocumentQueue , IDocumentJobData } from '@document-processing/infrastructure/queue/DocumentQueue';
 
 /**
  * Simple document worker that processes jobs using BullMQ
@@ -44,40 +44,75 @@ export class DocumentWorker {
   /**
    * Process a single job
    */
-  private async processJob(job: Job<IDocumentJobData>): Promise<void> {
-    const { documentId, filePath, stage, cancelled } = job.data;
-
-    // Check if job was marked for cancellation
-    if (cancelled === true) {
-      throw new Error(`Job cancelled by user request`);
+  public async processJob(job: Job<IDocumentJobData>): Promise<void> {
+    const { documentId, stage } = job.data;
+    
+    if (job.data.cancelled === true) {
+      throw new Error('Job was cancelled');
+    }
+    
+    const documentService = DocumentService.getInstance();
+    const document = await documentService.findById(documentId);
+    
+    if (!document) {
+      throw new Error(`Document with ID ${documentId} not found`);
     }
 
-    // Retrieve document from database
-    const domainDocument = await this.documentService.findById(documentId);
-    if (domainDocument === null) {
-      throw new Error(`Document ${documentId} not found in repository`);
+    // Check if document is completed (but allow failed states for retry)
+    if (document.status === DocumentStatus.COMPLETED) {
+      throw new Error(`Document ${documentId} is already completed`);
     }
 
-    // Process based on stage
+    if (document.status === DocumentStatus.FAILED || document.status === DocumentStatus.CANCELLED) {
+      throw new Error(`Document ${documentId} was cancelled or failed`);
+    }
+
+    // Additional cancellation check - check if job was marked for cancellation
+    const { filePath } = job.data;
+    
     switch (stage) {
-      case 'ocr':
-        await this.processor.processOCR(domainDocument);
-        // Queue next stage
-        await this.queue.addValidationJob(documentId, filePath);
+      case 'ocr': {
+        await this.processor.processOCR(document);
+        await this.checkCancellation(job, documentId);
+        const updatedAfterOCR = await this.documentService.findById(documentId);
+        if (updatedAfterOCR && !updatedAfterOCR.validationResult) {
+          await this.queue.addValidationJob(documentId, filePath);
+        }
         break;
-      case 'validation':
-        await this.processor.processValidation(domainDocument);
-        // Queue next stage
-        await this.queue.addPersistenceJob(documentId, filePath);
+      }
+      case 'validation': {
+        await this.processor.processValidation(document);
+        await this.checkCancellation(job, documentId);
+        const updatedAfterValidation = await this.documentService.findById(documentId);
+        if (updatedAfterValidation && updatedAfterValidation.status !== DocumentStatus.COMPLETED) {
+          await this.queue.addPersistenceJob(documentId, filePath);
+        }
         break;
-      case 'persistence':
-        await this.processor.processPersistence(domainDocument);
-        // Processing complete
+      }
+      case 'persistence': {
+        await this.processor.processPersistence(document);
+        await this.checkCancellation(job, documentId);
         break;
+      }
       default:
         throw new Error(`Unknown processing stage: ${stage as string}`);
     }
 
+  }
+
+  /**
+   * Check if job or document was cancelled during processing
+   */
+  private async checkCancellation(job: Job<IDocumentJobData>, documentId: string): Promise<void> {
+    if (job.data.cancelled === true) {
+      throw new Error(`Job ${documentId} was cancelled`);
+    }
+    
+    // Check document status from database for additional cancellation verification
+    const document = await this.documentService.findById(documentId);
+    if (document?.status === DocumentStatus.CANCELLED || document?.status === DocumentStatus.FAILED) {
+      throw new Error(`Document ${documentId} was cancelled or failed`);
+    }
   }
 
   /**

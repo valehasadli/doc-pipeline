@@ -1,5 +1,8 @@
 import { Queue, Worker, Job } from 'bullmq';
 
+import { Document } from '@document-processing/domain/entities/Document';
+import { DocumentStatus } from '@document-processing/domain/enums/DocumentStatus';
+
 /**
  * Simple job data interface
  */
@@ -109,42 +112,97 @@ export class DocumentQueue {
    * Cancel job by document ID (including active jobs)
    */
   public async cancelJob(documentId: string): Promise<void> {
+    // First check if document is already cancelled or completed
+    try {
+      const { DocumentService } = await import('@document-processing/application/services/DocumentService');
+      const documentService = DocumentService.getInstance();
+      const document = await documentService.findById(documentId);
+      
+      if (!document) {
+        throw new Error(`Document with ID ${documentId} not found`);
+      }
+      
+      if (document.status === DocumentStatus.CANCELLED) {
+        throw new Error(`Document ${documentId} is already cancelled`);
+      }
+      
+      if (document.status === DocumentStatus.COMPLETED) {
+        throw new Error(`Cannot cancel completed document ${documentId}`);
+      }
+      
+      if (document.status === DocumentStatus.FAILED) {
+        throw new Error(`Document ${documentId} has already failed and cannot be cancelled`);
+      }
+    } catch (error) {
+      // Re-throw the error to provide better feedback
+      throw error;
+    }
+
     const jobs = await this.queue.getJobs(['waiting', 'active', 'delayed']);
     const jobsToCancel = jobs.filter(job => job.data.documentId === documentId);
     
     if (jobsToCancel.length === 0) {
-      throw new Error(`No jobs found for document ${documentId}`);
+      throw new Error(`No active jobs found for document ${documentId}. Document may have already completed processing.`);
     }
 
     const errors: string[] = [];
     let cancelledCount = 0;
 
+    // Mark the document as cancelled in the database and move file to temp
+    try {
+      const { DocumentService } = await import('@document-processing/application/services/DocumentService');
+      
+      const documentService = DocumentService.getInstance();
+      const document = await documentService.findById(documentId);
+      
+      if (document) {
+        console.log(`🔍 Cancelling document with file path: ${document.filePath}`);
+        
+        // Update document status to cancelled (files stay in temp)
+        const cancelledDocument = new Document(
+          document.id,
+          document.filePath,
+          document.metadata,
+          DocumentStatus.CANCELLED,
+          document.createdAt,
+          new Date()
+        );
+        await documentService.updateDocument(cancelledDocument);
+        console.log(`📝 Updated document status to CANCELLED: ${document.id}`);
+      }
+    } catch (dbError) {
+      // Continue with job cancellation even if DB update fails
+      console.warn(`Failed to update document status during cancellation: ${dbError}`);
+    }
+
     for (const job of jobsToCancel) {
       try {
-        // For active jobs, try to move them to failed state first
-        if (await job.isActive()) {
-          await job.moveToFailed(new Error('Job cancelled by user'), '0');
-          cancelledCount++;
+        const isActive = await job.isActive();
+        
+        if (isActive) {
+          // For active jobs, update data to mark as cancelled and let the worker handle it
+          try {
+            await job.updateData({ ...job.data, cancelled: true });
+            console.log(`🚫 \x1b[33mMarked active job ${job.id} for cancellation\x1b[0m - Document: \x1b[36m${documentId}\x1b[0m`);
+            cancelledCount++;
+          } catch (updateError) {
+            // If we can't update data, try to remove the job
+            try {
+              await job.remove();
+              console.log(`🗑️ \x1b[33mRemoved job ${job.id}\x1b[0m - Document: \x1b[36m${documentId}\x1b[0m`);
+              cancelledCount++;
+            } catch (removeError) {
+              errors.push(`Failed to cancel job ${job.id}: ${removeError}`);
+            }
+          }
         } else {
-          // For waiting/delayed jobs, remove them normally
+          // For waiting/delayed jobs, remove them directly
           await job.remove();
           cancelledCount++;
         }
       } catch (error) {
-        // If job is locked and we can't move it to failed, try alternative approach
-        if (error instanceof Error && error.message.includes('locked')) {
-          try {
-            // Mark job as failed to signal cancellation to worker
-            await job.updateData({ ...job.data, cancelled: true });
-            // eslint-disable-next-line no-console
-            console.log(`Marked job ${job.id} for cancellation - worker will handle gracefully`);
-            cancelledCount++;
-          } catch (updateError) {
-            errors.push(`Job ${job.id} is currently being processed and cannot be cancelled`);
-          }
-        } else {
-          errors.push(`Failed to cancel job ${job.id}: ${error instanceof Error ? error.message : 'Unknown error'}`);
-        }
+        const errorMsg = error instanceof Error ? error.message : 'Unknown error';
+        errors.push(`Failed to cancel job ${job.id}: ${errorMsg}`);
       }
     }
 
@@ -175,15 +233,43 @@ export class DocumentQueue {
       }
     );
 
-    // Basic error handling
+    // Enhanced error handling with beautiful console output
     worker.on('failed', (job, err) => {
-      // eslint-disable-next-line no-console
-      console.error(`Job ${job?.id ?? 'unknown'} failed for document ${job?.data.documentId ?? 'unknown'}:`, err);
+      if (job) {
+        const documentId = job.data.documentId;
+        const stage = job.data.stage;
+        const jobId = job.id;
+        const isCancelled = job.data.cancelled || err.message.includes('cancelled');
+        
+        if (isCancelled) {
+          // eslint-disable-next-line no-console
+          console.log(`\n🚫 \x1b[33mJob ${jobId} CANCELLED\x1b[0m`);
+          // eslint-disable-next-line no-console
+          console.log(`   📄 Document: \x1b[36m${documentId}\x1b[0m`);
+          // eslint-disable-next-line no-console
+          console.log(`   🔄 Stage: \x1b[35m${stage}\x1b[0m`);
+          // eslint-disable-next-line no-console
+          console.log(`   💬 Reason: \x1b[33mJob was cancelled\x1b[0m\n`);
+        } else {
+          // eslint-disable-next-line no-console
+          console.log(`\n❌ \x1b[31mJob ${jobId} FAILED\x1b[0m`);
+          // eslint-disable-next-line no-console
+          console.log(`   📄 Document: \x1b[36m${documentId}\x1b[0m`);
+          // eslint-disable-next-line no-console
+          console.log(`   🔄 Stage: \x1b[35m${stage}\x1b[0m`);
+          // eslint-disable-next-line no-console
+          console.log(`   💬 Error: \x1b[31m${err.message}\x1b[0m\n`);
+        }
+      }
     });
 
     worker.on('completed', (job) => {
+      const documentId = job.data.documentId;
+      const stage = job.data.stage;
+      const stageEmoji = stage === 'ocr' ? '👁️' : stage === 'validation' ? '✅' : '💾';
+      
       // eslint-disable-next-line no-console
-      console.log(`Job ${job.id} completed successfully for document ${job.data.documentId} (stage: ${job.data.stage})`);
+      console.log(`${stageEmoji} \x1b[32mJob ${job.id} completed\x1b[0m - Document: \x1b[36m${documentId}\x1b[0m (${stage})`);
     });
 
     worker.on('error', (err) => {

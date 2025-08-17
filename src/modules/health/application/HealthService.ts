@@ -194,8 +194,8 @@ export class HealthService {
       const fs = await import('fs/promises');
       const path = await import('path');
       
-      const localStoragePath = process.env['LOCAL_STORAGE_PATH'] ?? 'uploads/';
-      const uploadsDir = path.join(process.cwd(), localStoragePath);
+      const uploadsPath = process.env['LOCAL_STORAGE_PATH'] ?? './uploads';
+      const uploadsDir = path.join(process.cwd(), uploadsPath);
       
       // Ensure filesystem directory exists
       await fs.mkdir(uploadsDir, { recursive: true });

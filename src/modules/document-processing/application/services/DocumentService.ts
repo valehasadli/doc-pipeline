@@ -142,7 +142,7 @@ export class DocumentService {
     await this.documentQueue.cancelJob(documentId);
     
     // Update document status to cancelled
-    document.markAsFailed();
+    document.markAsCancelled();
     
     await this.documentRepository.update(document);
   }
@@ -157,23 +157,27 @@ export class DocumentService {
       throw new Error(`Document with ID ${documentId} not found`);
     }
 
-    if (!document.hasFailed() && document.status !== DocumentStatus.FAILED) {
-      throw new Error('Can only retry failed documents');
+    if (!document.hasFailed() && document.status !== DocumentStatus.FAILED && document.status !== DocumentStatus.CANCELLED) {
+      throw new Error('Can only retry failed or cancelled documents');
     }
 
-    // Create new document instance with UPLOADED status to restart processing
-    const newDocument = new Document(
-      document.id,
-      document.filePath,
-      document.metadata,
-      DocumentStatus.UPLOADED
-    );
+    // Optimize retry based on failure stage
+    if (document.status === DocumentStatus.PERSISTENCE_FAILED && 
+        document.ocrResult && document.validationResult?.isValid) {
+      // Only retry persistence stage if OCR and validation already succeeded
+      await this.documentQueue.addPersistenceJob(documentId, document.filePath);
+    } else {
+      // Full retry from the beginning for other failures
+      const newDocument = new Document(
+        document.id,
+        document.filePath,
+        document.metadata,
+        DocumentStatus.UPLOADED
+      );
 
-    // Update stored document
-    await this.documentRepository.update(newDocument);
-
-    // Restart processing
-    await this.documentQueue.addOCRJob(documentId, document.filePath);
+      await this.documentRepository.update(newDocument);
+      await this.documentQueue.addOCRJob(documentId, document.filePath);
+    }
   }
 
   /**
@@ -191,6 +195,13 @@ export class DocumentService {
    */
   public async updateDocument(document: Document): Promise<void> {
     await this.documentRepository.update(document);
+  }
+
+  /**
+   * Find documents by status for cleanup operations
+   */
+  public async findDocumentsByStatus(statuses: DocumentStatus[]): Promise<Document[]> {
+    return await this.documentRepository.findByStatuses(statuses);
   }
 
   /**
