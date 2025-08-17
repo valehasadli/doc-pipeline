@@ -205,12 +205,12 @@ describe('DocumentService', () => {
       expect(documents).toHaveLength(2);
       expect(documents[0]?.status).toBe(DocumentStatus.UPLOADED);
       expect(documents[0]).toEqual(expect.objectContaining({
-        documentId: expect.any(String),
-        documentFilePath: expect.any(String),
-        documentMetadata: expect.any(Object),
-        documentStatus: DocumentStatus.UPLOADED,
-        documentCreatedAt: expect.any(Date),
-        documentUpdatedAt: expect.any(Date)
+        id: expect.any(String),
+        filePath: expect.any(String),
+        metadata: expect.any(Object),
+        status: DocumentStatus.UPLOADED,
+        createdAt: expect.any(Date),
+        updatedAt: expect.any(Date)
       }));
     });
 

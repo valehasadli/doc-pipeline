@@ -6,21 +6,17 @@
  * notifications, auditing, and triggering side effects.
  */
 
+import { IDomainEvent as ISharedDomainEvent } from '@shared/domain/types/common';
+
 import { DocumentStatus } from '../enums/DocumentStatus';
 
 /**
- * Base domain event interface
+ * Document-specific domain event interface
+ * Extends shared interface but maintains document-specific naming for compatibility
  */
-export interface IDomainEvent {
-  readonly eventId: string;
-  readonly eventType: string;
-  readonly aggregateId: string;
-  readonly aggregateType: string;
-  readonly eventVersion: number;
-  readonly occurredAt: Date;
+export interface IDomainEvent extends Omit<ISharedDomainEvent, 'eventData'> {
   readonly metadata?: Record<string, unknown>;
 }
-
 
 
 /**
@@ -46,12 +42,10 @@ export interface IDocumentStatusChangedEvent extends IDomainEvent {
   readonly eventType: 'DocumentStatusChanged';
   readonly payload: {
     readonly documentId: string;
-    readonly fromStatus: DocumentStatus | null;
-    readonly toStatus: DocumentStatus;
+    readonly previousStatus: DocumentStatus;
+    readonly newStatus: DocumentStatus;
     readonly reason?: string;
-    readonly processingStage?: string;
-    readonly retryCount: number;
-    readonly processingDuration?: number;
+    readonly changedAt: Date;
   };
 }
 
@@ -62,9 +56,7 @@ export interface IDocumentProcessingStartedEvent extends IDomainEvent {
   readonly eventType: 'DocumentProcessingStarted';
   readonly payload: {
     readonly documentId: string;
-    readonly stage: 'ocr' | 'validation' | 'persistence';
-    readonly jobId: string;
-    readonly attemptNumber: number;
+    readonly processingStage: string;
     readonly startedAt: Date;
   };
 }
@@ -76,11 +68,9 @@ export interface IDocumentProcessingCompletedEvent extends IDomainEvent {
   readonly eventType: 'DocumentProcessingCompleted';
   readonly payload: {
     readonly documentId: string;
-    readonly stage: 'ocr' | 'validation' | 'persistence';
-    readonly jobId: string;
+    readonly processingStage: string;
     readonly completedAt: Date;
-    readonly processingDuration: number;
-    readonly result?: Record<string, unknown>;
+    readonly duration: number;
   };
 }
 
@@ -91,15 +81,10 @@ export interface IDocumentProcessingFailedEvent extends IDomainEvent {
   readonly eventType: 'DocumentProcessingFailed';
   readonly payload: {
     readonly documentId: string;
-    readonly stage: 'ocr' | 'validation' | 'persistence';
-    readonly jobId: string;
+    readonly processingStage: string;
+    readonly error: string;
     readonly failedAt: Date;
-    readonly error: {
-      readonly type: string;
-      readonly message: string;
-      readonly retryable: boolean;
-    };
-    readonly attemptNumber: number;
+    readonly retryCount: number;
     readonly willRetry: boolean;
   };
 }

@@ -1,9 +1,11 @@
 import { DocumentService, IDocumentUploadRequest, IDocumentUploadResponse } from '@document-processing/application/services/DocumentService';
+import { IUseCase } from '@shared/domain/types/common';
 
 /**
  * Use case for uploading and starting document processing
+ * Implements shared IUseCase interface
  */
-export class UploadDocumentUseCase {
+export class UploadDocumentUseCase implements IUseCase<IDocumentUploadRequest, IDocumentUploadResponse> {
   private readonly documentService: DocumentService;
 
   constructor(documentService?: DocumentService) {

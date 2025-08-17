@@ -8,7 +8,7 @@ import type { IAggregateRoot, IDomainEvent } from '@/modules/shared/domain/types
 export abstract class AggregateRoot implements IAggregateRoot {
   public readonly id: string;
   public readonly createdAt: Date;
-  public readonly updatedAt: Date;
+  public updatedAt: Date;
   public readonly version: number;
 
   private readonly uncommittedEvents: IDomainEvent[] = [];
@@ -47,7 +47,7 @@ export abstract class AggregateRoot implements IAggregateRoot {
       aggregateId: this.id,
       aggregateType: this.constructor.name,
       eventVersion: this.version,
-      occurredOn: new Date(),
+      occurredAt: new Date(),
       eventData,
     };
   }

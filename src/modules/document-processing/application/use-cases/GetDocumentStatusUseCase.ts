@@ -1,9 +1,11 @@
 import { DocumentService, IDocumentStatusResponse } from '@document-processing/application/services/DocumentService';
+import { IUseCase } from '@shared/domain/types/common';
 
 /**
  * Use case for retrieving document status and details
+ * Implements shared IUseCase interface
  */
-export class GetDocumentStatusUseCase {
+export class GetDocumentStatusUseCase implements IUseCase<string, IDocumentStatusResponse> {
   private readonly documentService: DocumentService;
 
   constructor(documentService?: DocumentService) {

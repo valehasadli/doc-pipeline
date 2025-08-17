@@ -6,6 +6,7 @@
  */
 
 import { DocumentStatus } from '@document-processing/domain/enums/DocumentStatus';
+import { AggregateRoot } from '@shared/domain/base/AggregateRoot';
 
 /**
  * Document metadata interface
@@ -36,18 +37,15 @@ export interface IValidationResult {
 }
 
 /**
- * Simple Document aggregate root for the interview challenge
- * Focuses on core business logic without unnecessary complexity
+ * Document entity class extending AggregateRoot for proper DDD implementation
+ * Focuses on core business logic with event sourcing capabilities
  */
-export class Document {
-  private readonly documentId: string;
+export class Document extends AggregateRoot {
   private readonly documentFilePath: string;
   private readonly documentMetadata: IDocumentMetadata;
   private documentStatus: DocumentStatus;
   private documentOcrResult?: IOCRResult;
   private documentValidationResult?: IValidationResult;
-  private readonly documentCreatedAt: Date;
-  private documentUpdatedAt: Date;
 
   constructor(
     id: string,
@@ -55,21 +53,29 @@ export class Document {
     metadata: IDocumentMetadata,
     status: DocumentStatus = DocumentStatus.UPLOADED,
     createdAt?: Date,
-    updatedAt?: Date
+    updatedAt?: Date,
+    version?: number
   ) {
-    this.documentId = id;
+    super(id, createdAt, updatedAt, version);
     this.documentFilePath = filePath;
     this.documentMetadata = metadata;
     this.documentStatus = status;
-    this.documentCreatedAt = createdAt ?? new Date();
-    this.documentUpdatedAt = updatedAt ?? new Date();
+    
+    // Emit domain event for document creation
+    if (!createdAt) {
+      this.addDomainEvent(
+        this.createDomainEvent('DocumentCreated', {
+          documentId: this.id,
+          fileName: metadata.fileName,
+          fileSize: metadata.fileSize,
+          mimeType: metadata.mimeType,
+          status: status
+        })
+      );
+    }
   }
 
   // Getters
-  public get id(): string {
-    return this.documentId;
-  }
-
   public get filePath(): string {
     return this.documentFilePath;
   }
@@ -87,18 +93,10 @@ export class Document {
   }
 
   public get validationResult(): IValidationResult | undefined {
-    return this.documentValidationResult ? {
+    return this.documentValidationResult ? { 
       ...this.documentValidationResult,
       errors: [...this.documentValidationResult.errors]
     } : undefined;
-  }
-
-  public get createdAt(): Date {
-    return this.documentCreatedAt;
-  }
-
-  public get updatedAt(): Date {
-    return this.documentUpdatedAt;
   }
 
   // Business logic methods
@@ -111,7 +109,7 @@ export class Document {
       throw new Error(`Cannot start OCR processing. Current status: ${this.documentStatus}`);
     }
     this.documentStatus = DocumentStatus.PROCESSING_OCR;
-    this.documentUpdatedAt = new Date();
+    this.updatedAt = new Date();
   }
 
   /**
@@ -123,7 +121,7 @@ export class Document {
     }
     this.documentOcrResult = { ...ocrResult };
     this.documentStatus = DocumentStatus.OCR_COMPLETED;
-    this.documentUpdatedAt = new Date();
+    this.updatedAt = new Date();
   }
 
   /**
@@ -134,17 +132,17 @@ export class Document {
       throw new Error(`Cannot fail OCR processing. Current status: ${this.documentStatus}`);
     }
     this.documentStatus = DocumentStatus.OCR_FAILED;
-    this.documentUpdatedAt = new Date();
+    this.updatedAt = new Date();
   }
 
   public markAsFailed(): void {
     this.documentStatus = DocumentStatus.FAILED;
-    this.documentUpdatedAt = new Date();
+    this.updatedAt = new Date();
   }
 
   public markAsCancelled(): void {
     this.documentStatus = DocumentStatus.CANCELLED;
-    this.documentUpdatedAt = new Date();
+    this.updatedAt = new Date();
   }
 
   /**
@@ -155,7 +153,7 @@ export class Document {
       throw new Error(`Cannot start validation processing. Current status: ${this.documentStatus}`);
     }
     this.documentStatus = DocumentStatus.PROCESSING_VALIDATION;
-    this.documentUpdatedAt = new Date();
+    this.updatedAt = new Date();
   }
 
   /**
@@ -170,7 +168,7 @@ export class Document {
       errors: [...validationResult.errors] 
     };
     this.documentStatus = DocumentStatus.VALIDATION_COMPLETED;
-    this.documentUpdatedAt = new Date();
+    this.updatedAt = new Date();
   }
 
   /**
@@ -181,7 +179,7 @@ export class Document {
       throw new Error(`Cannot fail validation processing. Current status: ${this.documentStatus}`);
     }
     this.documentStatus = DocumentStatus.VALIDATION_FAILED;
-    this.documentUpdatedAt = new Date();
+    this.updatedAt = new Date();
   }
 
   /**
@@ -193,7 +191,7 @@ export class Document {
       throw new Error(`Cannot start persistence processing. Current status: ${this.documentStatus}`);
     }
     this.documentStatus = DocumentStatus.PROCESSING_PERSISTENCE;
-    this.documentUpdatedAt = new Date();
+    this.updatedAt = new Date();
   }
 
   /**
@@ -204,7 +202,7 @@ export class Document {
       throw new Error(`Cannot complete persistence processing. Current status: ${this.documentStatus}`);
     }
     this.documentStatus = DocumentStatus.COMPLETED;
-    this.documentUpdatedAt = new Date();
+    this.updatedAt = new Date();
   }
 
   /**
@@ -215,7 +213,7 @@ export class Document {
       throw new Error(`Cannot fail persistence processing. Current status: ${this.documentStatus}`);
     }
     this.documentStatus = DocumentStatus.PERSISTENCE_FAILED;
-    this.documentUpdatedAt = new Date();
+    this.updatedAt = new Date();
   }
 
   // Utility methods
@@ -252,7 +250,7 @@ export class Document {
     updatedAt: Date;
   } {
     return {
-      id: this.documentId,
+      id: this.id,
       filePath: this.documentFilePath,
       metadata: { ...this.documentMetadata },
       status: this.documentStatus,
@@ -261,8 +259,8 @@ export class Document {
         ...this.documentValidationResult, 
         errors: [...this.documentValidationResult.errors] 
       } : undefined,
-      createdAt: new Date(this.documentCreatedAt),
-      updatedAt: new Date(this.documentUpdatedAt)
+      createdAt: new Date(this.createdAt),
+      updatedAt: new Date(this.updatedAt)
     };
   }
 }

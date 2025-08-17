@@ -1,19 +1,17 @@
 import { Document } from '@document-processing/domain/entities/Document';
 import { DocumentStatus } from '@document-processing/domain/enums/DocumentStatus';
+import { IRepository } from '@shared/domain/types/common';
 
 import { DocumentModel, IDocumentDocument } from '../models/DocumentModel';
 
 /**
  * Document repository interface
+ * Extends shared repository interface with document-specific methods
  */
-export interface IDocumentRepository {
-  save(document: Document): Promise<void>;
-  findById(id: string): Promise<Document | null>;
+export interface IDocumentRepository extends IRepository<Document> {
   findByStatus(status: DocumentStatus): Promise<Document[]>;
   findByStatuses(statuses: DocumentStatus[]): Promise<Document[]>;
   findAll(): Promise<Document[]>;
-  update(document: Document): Promise<void>;
-  delete(id: string): Promise<void>;
   exists(id: string): Promise<boolean>;
   getStatistics(): Promise<{
     total: number;
