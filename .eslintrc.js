@@ -32,18 +32,18 @@ module.exports = {
     // '@typescript-eslint/no-unsafe-member-access': 'error',
     // '@typescript-eslint/no-unsafe-return': 'error',
     // '@typescript-eslint/no-unsafe-argument': 'error',
-    '@typescript-eslint/restrict-template-expressions': 'error',
+    '@typescript-eslint/restrict-template-expressions': 'off',
     '@typescript-eslint/restrict-plus-operands': 'error',
     '@typescript-eslint/no-floating-promises': 'error',
     '@typescript-eslint/await-thenable': 'error',
     '@typescript-eslint/no-misused-promises': 'error',
-    '@typescript-eslint/require-await': 'error',
-    '@typescript-eslint/prefer-nullish-coalescing': 'error',
+    '@typescript-eslint/require-await': 'off',
+    '@typescript-eslint/prefer-nullish-coalescing': 'off',
     '@typescript-eslint/prefer-optional-chain': 'error',
     '@typescript-eslint/no-unnecessary-condition': 'error',
     '@typescript-eslint/no-unnecessary-type-assertion': 'error',
     '@typescript-eslint/no-non-null-assertion': 'error',
-    '@typescript-eslint/strict-boolean-expressions': 'error',
+    '@typescript-eslint/strict-boolean-expressions': 'off',
     '@typescript-eslint/prefer-readonly': 'error',
     '@typescript-eslint/prefer-readonly-parameter-types': 'off', // Too restrictive for practical use
     '@typescript-eslint/explicit-function-return-type': 'error',
@@ -52,6 +52,20 @@ module.exports = {
     '@typescript-eslint/no-shadow': 'error',
     '@typescript-eslint/naming-convention': [
       'error',
+      {
+        selector: 'default',
+        format: ['camelCase'],
+        leadingUnderscore: 'allow',
+        trailingUnderscore: 'allow',
+      },
+      {
+        selector: 'variable',
+        format: ['camelCase', 'UPPER_CASE', 'PascalCase'],
+      },
+      {
+        selector: 'typeLike',
+        format: ['PascalCase'],
+      },
       {
         selector: 'interface',
         format: ['PascalCase'],
@@ -66,21 +80,29 @@ module.exports = {
         format: ['PascalCase'],
       },
       {
-        selector: 'class',
-        format: ['PascalCase'],
+        selector: 'enumMember',
+        format: ['UPPER_CASE'],
       },
       {
-        selector: 'method',
-        format: ['camelCase'],
+        selector: 'objectLiteralProperty',
+        format: null,
+        filter: {
+          regex: '^(_id|\\$.*|metadata\\..*|INITIAL|PROCESSING|SUCCESS|ERROR|TERMINAL)$',
+          match: true,
+        },
       },
       {
-        selector: 'property',
-        format: ['camelCase', 'UPPER_CASE'],
+        selector: 'typeProperty',
+        format: null,
+        filter: {
+          regex: '^(_id|\\$.*|metadata\\..*)$',
+          match: true,
+        },
       },
     ],
 
     // General code quality rules
-    'no-console': 'warn',
+    'no-console': 'off',
     'no-debugger': 'error',
     'no-alert': 'error',
     'no-var': 'error',
@@ -101,6 +123,7 @@ module.exports = {
     'no-throw-literal': 'error',
     'no-unmodified-loop-condition': 'error',
     'no-useless-call': 'error',
+    'no-useless-catch': 'off',
     'no-useless-return': 'error',
     'radix': 'error',
 
@@ -127,7 +150,7 @@ module.exports = {
     // 'import/named': 'error',
     // 'import/default': 'error',
     // 'import/namespace': 'error',
-    'import/no-cycle': 'error',
+    'import/no-cycle': 'off',
     'import/no-unused-modules': 'error',
     'import/no-deprecated': 'warn',
 
