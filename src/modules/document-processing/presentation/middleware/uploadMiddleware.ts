@@ -38,4 +38,4 @@ const upload = multer({
   }
 });
 
-export { upload };
+export { upload as uploadMiddleware };
