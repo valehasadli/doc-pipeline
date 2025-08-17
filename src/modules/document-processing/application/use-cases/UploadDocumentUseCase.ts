@@ -42,10 +42,10 @@ export class UploadDocumentUseCase {
     // Business rule validation (not presentation concerns)
     // File type validation is now handled by multer middleware at presentation layer
     
-    // Business rule: File size limit (10MB)
-    const maxSizeBytes = 10 * 1024 * 1024; // 10MB
+    // Business rule: File size limit
+    const maxSizeBytes = parseInt(process.env['MAX_FILE_SIZE'] ?? '10485760', 10);
     if (request.metadata.fileSize > maxSizeBytes) {
-      throw new Error('File size exceeds maximum allowed size of 10MB');
+      throw new Error(`File size exceeds maximum allowed size of ${Math.round(maxSizeBytes / 1024 / 1024)}MB`);
     }
 
     // Business rule: File name length limit

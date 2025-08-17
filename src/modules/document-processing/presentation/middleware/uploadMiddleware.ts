@@ -4,10 +4,13 @@ import multer from 'multer';
  * Multer configuration for file uploads
  * Handles file type validation and upload constraints at presentation layer
  */
+const localStoragePath = process.env['LOCAL_STORAGE_PATH'] ?? 'uploads/';
+const maxFileSize = parseInt(process.env['MAX_FILE_SIZE'] ?? '10485760', 10);
+
 export const uploadMiddleware = multer({
-  dest: 'uploads/',
+  dest: localStoragePath,
   limits: {
-    fileSize: 10 * 1024 * 1024, // 10MB limit
+    fileSize: maxFileSize,
   },
   fileFilter: (_req, file, cb) => {
     // Accept common document types (consolidated from use case validation)
