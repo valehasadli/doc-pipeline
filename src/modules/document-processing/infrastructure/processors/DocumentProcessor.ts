@@ -105,8 +105,9 @@ export class DocumentProcessor {
    * Simulate OCR processing (as required by interview)
    */
   private async simulateOCR(document: Document): Promise<IOCRResult> {
-    // Simulate processing delay
-    await this.delay(1000 + Math.random() * 2000); // 1-3 seconds
+    // Simulate processing delay (configurable via env)
+    const ocrDelayMs = parseInt(process.env['OCR_SIMULATION_DELAY_MS'] ?? '60000', 10);
+    await this.delay(ocrDelayMs);
 
     // Simulate OCR based on file type
     const mimeType = document.metadata.mimeType;
@@ -138,8 +139,9 @@ export class DocumentProcessor {
    * Validate document content
    */
   private async validateDocument(document: Document): Promise<IValidationResult> {
-    // Simulate validation delay
-    await this.delay(500 + Math.random() * 1000); // 0.5-1.5 seconds
+    // Simulate validation delay (configurable via env)
+    const validationDelayMs = parseInt(process.env['VALIDATION_SIMULATION_DELAY_MS'] ?? '60000', 10);
+    await this.delay(validationDelayMs);
 
     const ocrResult = document.ocrResult;
     if (!ocrResult) {

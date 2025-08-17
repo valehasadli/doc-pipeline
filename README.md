@@ -25,7 +25,19 @@ A TypeScript Express app with health check endpoints. Currently in foundation se
 npm run docker:services
 ```
 
-### 2. Start the App Locally
+### 2. Configure Processing Delays (Optional)
+Set environment variables to control simulation delays:
+```bash
+# For fast testing (default: 1 minute each)
+export OCR_SIMULATION_DELAY_MS=1000          # 1 second
+export VALIDATION_SIMULATION_DELAY_MS=1000   # 1 second
+
+# For manual testing with longer delays
+export OCR_SIMULATION_DELAY_MS=60000         # 1 minute
+export VALIDATION_SIMULATION_DELAY_MS=60000  # 1 minute
+```
+
+### 3. Start the App Locally
 ```bash
 # Start the Express app on your machine
 npm run start:dev

@@ -252,7 +252,7 @@ describe('DocumentService', () => {
         .rejects.toThrow('Document with ID non-existent-id not found');
     });
 
-    it('should cancel completed document (no validation in current implementation)', async () => {
+    it('should not allow canceling completed document', async () => {
       const uploadResult = await documentService.uploadDocument(mockUploadRequest);
       
       // Mock the repository to return a completed document
@@ -274,9 +274,9 @@ describe('DocumentService', () => {
 
       mockRepository.findById.mockResolvedValue(completedDocument);
 
-      // Current implementation allows canceling completed documents
+      // Should throw error when trying to cancel completed document
       await expect(documentService.cancelDocument(uploadResult.documentId))
-        .resolves.not.toThrow();
+        .rejects.toThrow('Cannot cancel completed document');
     });
   });
 

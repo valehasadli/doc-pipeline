@@ -125,6 +125,19 @@ export class DocumentService {
       throw new Error(`Document with ID ${documentId} not found`);
     }
 
+    // Check if document can be cancelled
+    if (document.status === DocumentStatus.COMPLETED) {
+      throw new Error('Cannot cancel completed document');
+    }
+    
+    if (document.status === DocumentStatus.FAILED || 
+        document.status === DocumentStatus.OCR_FAILED ||
+        document.status === DocumentStatus.VALIDATION_FAILED ||
+        document.status === DocumentStatus.PERSISTENCE_FAILED ||
+        document.status === DocumentStatus.DEAD_LETTER) {
+      throw new Error('Cannot cancel already failed document');
+    }
+
     // Cancel processing jobs in queue
     await this.documentQueue.cancelJob(documentId);
     
