@@ -1,7 +1,8 @@
 import { Router, Request, Response } from 'express';
 
-import { DocumentController, uploadMiddleware } from '@document-processing/presentation/controllers/DocumentController';
+import { DocumentController } from '@document-processing/presentation/controllers/DocumentController';
 import { handleMulterErrors, handleGlobalErrors, asyncHandler } from '@document-processing/presentation/middleware/errorHandler';
+import { uploadMiddleware } from '@document-processing/presentation/middleware/uploadMiddleware';
 import { validateDocumentId, validateStatusQuery, validatePaginationQuery } from '@document-processing/presentation/middleware/validation';
 
 /**

@@ -22,6 +22,7 @@ export class UploadDocumentUseCase {
   }
 
   private validateRequest(request: IDocumentUploadRequest): void {
+    // Basic required field validation
     if (!request.filePath) {
       throw new Error('File path is required');
     }
@@ -38,22 +39,20 @@ export class UploadDocumentUseCase {
       throw new Error('File size must be greater than 0');
     }
 
-    // Validate file type
-    const allowedMimeTypes = [
-      'application/pdf',
-      'text/plain',
-      'image/jpeg',
-      'image/png'
-    ];
-
-    if (!allowedMimeTypes.includes(request.metadata.mimeType)) {
-      throw new Error(`Unsupported file type: ${request.metadata.mimeType}`);
+    // Business rule validation (not presentation concerns)
+    // File type validation is now handled by multer middleware at presentation layer
+    
+    // Business rule: File size limit (10MB)
+    const maxSizeBytes = 10 * 1024 * 1024; // 10MB
+    if (request.metadata.fileSize > maxSizeBytes) {
+      throw new Error('File size exceeds maximum allowed size of 10MB');
     }
 
-    // Validate file size (max 10MB)
-    const maxFileSize = 10 * 1024 * 1024; // 10MB in bytes
-    if (request.metadata.fileSize > maxFileSize) {
-      throw new Error('File size exceeds maximum limit of 10MB');
+    // Business rule: File name length limit
+    if (request.metadata.fileName.length > 255) {
+      throw new Error('File name too long (maximum 255 characters)');
     }
+
+    // Note: Empty file check is redundant with fileSize <= 0 check above
   }
 }

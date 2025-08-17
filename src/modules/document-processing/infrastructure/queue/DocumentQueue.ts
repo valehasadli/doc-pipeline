@@ -114,12 +114,19 @@ export class DocumentQueue {
     );
 
     // Basic error handling
-    worker.on('failed', () => {
-      // Handle job failure
+    worker.on('failed', (job, err) => {
+      // eslint-disable-next-line no-console
+      console.error(`Job ${job?.id} failed for document ${job?.data?.documentId}:`, err);
     });
 
-    worker.on('completed', () => {
-      // Handle job completion
+    worker.on('completed', (job) => {
+      // eslint-disable-next-line no-console
+      console.log(`Job ${job.id} completed successfully for document ${job.data.documentId} (stage: ${job.data.stage})`);
+    });
+
+    worker.on('error', (err) => {
+      // eslint-disable-next-line no-console
+      console.error('Worker error:', err);
     });
 
     this.workers.push(worker);
