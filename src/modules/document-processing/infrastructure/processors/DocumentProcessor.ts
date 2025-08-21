@@ -157,6 +157,10 @@ export class DocumentProcessor {
     if (!(await this.storageProvider.exists(permPath))) {
       throw new Error('File move failed verification');
     }
+
+    // Update document file path to permanent location
+    const fullPermPath = `uploads/${permPath}`;
+    document.updateFilePath(fullPermPath);
   }
 
   /**

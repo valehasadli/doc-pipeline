@@ -273,6 +273,24 @@ describe('Document', () => {
         'Cannot fail persistence processing. Current status: validation_completed'
       );
     });
+
+    it('should update file path during persistence processing', async () => {
+      document.startPersistenceProcessing();
+      const initialUpdatedAt = document.updatedAt;
+      
+      // Add small delay to ensure timestamp difference
+      await new Promise(resolve => setTimeout(resolve, 1));
+      document.updateFilePath('/uploads/permanent/doc-123_file.pdf');
+
+      expect(document.filePath).toBe('/uploads/permanent/doc-123_file.pdf');
+      expect(document.updatedAt.getTime()).toBeGreaterThan(initialUpdatedAt.getTime());
+    });
+
+    it('should not update file path from wrong status', () => {
+      expect(() => document.updateFilePath('/uploads/permanent/doc-123_file.pdf')).toThrow(
+        'Cannot update file path. Current status: validation_completed'
+      );
+    });
   });
 
   describe('General Failure Handling', () => {

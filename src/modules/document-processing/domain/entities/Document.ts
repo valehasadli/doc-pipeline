@@ -80,6 +80,23 @@ export class Document extends AggregateRoot {
     return this.documentFilePath;
   }
 
+  /**
+   * Update file path after moving to permanent storage
+   */
+  public updateFilePath(newPath: string): void {
+    if (this.documentStatus !== DocumentStatus.PROCESSING_PERSISTENCE) {
+      throw new Error(`Cannot update file path. Current status: ${this.documentStatus}`);
+    }
+    // Use Object.defineProperty to update readonly property
+    Object.defineProperty(this, 'documentFilePath', {
+      value: newPath,
+      writable: false,
+      enumerable: true,
+      configurable: false
+    });
+    this.updatedAt = new Date();
+  }
+
   public get metadata(): IDocumentMetadata {
     return { ...this.documentMetadata };
   }
